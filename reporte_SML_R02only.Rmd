@@ -1,0 +1,240 @@
+---
+title: "El Salario Mínimo Legal y su Impacto (EPHC)"
+subtitle: "Versión simplificada (solo REG02 – Personas)"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    latex_engine: xelatex
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE
+)
+
+options(scipen = 999)
+
+fmt_gs <- function(x, digits = 0) {
+  ifelse(
+    is.na(x),
+    NA_character_,
+    format(round(x, digits), big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE)
+  )
+}
+
+LOCAL_R_LIB <- file.path(getwd(), "r_lib")
+if (dir.exists(LOCAL_R_LIB)) .libPaths(c(LOCAL_R_LIB, .libPaths()))
+```
+
+# Objetivo
+
+Este informe estudia la relación entre el **Salario Mínimo Legal (SML)** y variables del mercado laboral usando microdatos trimestrales de la **EPHC (INE)**.
+
+La versión actual utiliza **solo la base REG02 (personas)** y excluye variables de vivienda/hogar (REG01).
+
+# Ejecución del análisis
+
+```{r run-analysis}
+source("estudioSML_R02only.R")
+```
+
+```{r meta, results='asis'}
+anos <- sort(unique(db$anio))
+cat("**Años incluidos en el análisis:** ", min(anos), "–", max(anos), "\n\n", sep = "")
+if (max(anos) > max(sml_data$year, na.rm = TRUE)) {
+  cat("**Nota SML:** la serie de SML en el script llega hasta ", max(sml_data$year, na.rm = TRUE),
+      ". Para años posteriores se utiliza el último valor disponible (relleno hacia adelante).\\\n",
+      sep = "")
+}
+```
+
+# Salario mínimo legal (valores recientes)
+
+```{r sml-valores, results='asis'}
+sml_reciente <- sml_data %>%
+  filter(year >= 2024, mes == 7) %>%
+  transmute(
+    Año = year,
+    Desde = format(fecha, "%d/%m/%Y"),
+    `SML mensual (Gs.)` = fmt_gs(sml),
+    `Jornal diario aprox. (Gs.)` = fmt_gs(round(sml / 26, 0)),
+    Nota = dplyr::coalesce(tipo, "")
+  )
+knitr::kable(sml_reciente, caption = "SML mensual y jornal diario aproximado (26 jornales/mes)")
+```
+
+*Nota:* el valor 2026 corresponde a una proyección preliminar (no oficial); el ajuste definitivo se confirma usualmente en junio para regir desde julio.
+
+# Resultados descriptivos
+
+## Distribución por franja del SML
+
+Franjas definidas sobre el ratio `ingreso / SML`:
+
+- **Menos de 1 SML**: < 0.90
+- **1 SML**: 0.90 a 1.10
+- **Más de 1 SML**: > 1.10
+
+```{r tab-dist, results='asis'}
+dist_sml_print <- dist_sml %>%
+  mutate(pct = round(pct, 1)) %>%
+  dplyr::select(trimestredesc, ingoc1sml_cat, pct) %>%
+  tidyr::pivot_wider(names_from = ingoc1sml_cat, values_from = pct) %>%
+  arrange(trimestredesc)
+knitr::kable(dist_sml_print, caption = "Distribución porcentual por franja SML y trimestre (ponderado)")
+```
+
+```{r fig-dist, fig.cap="Distribución porcentual por franja SML"}
+g1
+```
+
+## Composición por género
+
+```{r tab-muj, results='asis'}
+prop_muj_print <- prop_muj %>%
+  mutate(pct_muj = round(100 * pct_muj, 1)) %>%
+  dplyr::select(trimestredesc, ingoc1sml_cat, pct_muj) %>%
+  tidyr::pivot_wider(names_from = ingoc1sml_cat, values_from = pct_muj) %>%
+  arrange(trimestredesc)
+knitr::kable(prop_muj_print, caption = "% de mujeres por franja SML y trimestre (ponderado)")
+```
+
+```{r fig-muj, fig.cap="Proporción de mujeres por franja SML"}
+g2
+```
+
+## Edad y educación
+
+```{r tab-edad-edu, results='asis'}
+edad_edu_print <- edad_edu %>%
+  mutate(
+    edad_prom = round(edad_prom, 1),
+    anios_edu_prom = round(anios_edu_prom, 1)
+  )
+knitr::kable(edad_edu_print, caption = "Edad y años de estudio promedio por franja SML y trimestre (ponderado)")
+```
+
+```{r fig-edad, fig.cap="Edad promedio por franja SML"}
+g3
+```
+
+```{r fig-edu, fig.cap="Años de estudio promedio por franja SML"}
+g4
+```
+
+## Cotización (formalidad)
+
+```{r tab-cotiza, results='asis'}
+prop_cotiza_print <- prop_cotiza %>%
+  mutate(prop_cotiz = round(100 * prop_cotiz, 1)) %>%
+  dplyr::select(trimestredesc, ingoc1sml_cat, prop_cotiz) %>%
+  tidyr::pivot_wider(names_from = ingoc1sml_cat, values_from = prop_cotiz) %>%
+  arrange(trimestredesc)
+knitr::kable(prop_cotiza_print, caption = "% de cotizantes por franja SML y trimestre (ponderado)")
+```
+
+```{r fig-cotiza, fig.cap="Proporción de cotizantes por franja SML"}
+g5
+```
+
+## Tamaño de empresa
+
+```{r tab-tama, results='asis'}
+tama_print <- tama %>%
+  mutate(tam_prom = round(tam_prom, 2))
+knitr::kable(tama_print, caption = "Tamaño promedio de empresa por franja SML y trimestre (ponderado)")
+```
+
+```{r fig-tama, fig.cap="Tamaño promedio de empresa por franja SML"}
+g6
+```
+
+## Salarios
+
+```{r tab-sal, results='asis'}
+sal_prom_print <- sal_prom %>%
+  mutate(sal_prom = round(sal_prom, 0)) %>%
+  dplyr::select(trimestredesc, sexo, ingoc1sml_cat, sal_prom) %>%
+  tidyr::pivot_wider(names_from = ingoc1sml_cat, values_from = sal_prom) %>%
+  arrange(trimestredesc, sexo) %>%
+  mutate(across(where(is.numeric), fmt_gs))
+knitr::kable(sal_prom_print, caption = "Salario promedio (mensual) por franja SML y género (ponderado)")
+```
+
+```{r fig-sal, fig.cap="Salario promedio (mensual) por franja SML y género"}
+g7
+```
+
+```{r tab-salhora, results='asis'}
+sal_hora_print <- sal_hora %>%
+  mutate(sal_hora_prom = round(sal_hora_prom, 0)) %>%
+  dplyr::select(trimestredesc, sexo, ingoc1sml_cat, sal_hora_prom) %>%
+  tidyr::pivot_wider(names_from = ingoc1sml_cat, values_from = sal_hora_prom) %>%
+  arrange(trimestredesc, sexo) %>%
+  mutate(across(where(is.numeric), fmt_gs))
+knitr::kable(sal_hora_print, caption = "Salario por hora promedio por franja SML y género (ponderado)")
+```
+
+# Econometría (diseño de encuesta)
+
+Modelos `svyglm`: probabilidad de cotizar en función de la franja del SML y controles (edad, educación, sexo, tamaño empresa, área y efectos fijos de trimestre y rama).
+
+```{r tab-svyglm, results='asis'}
+extract_coef <- function(model, terms_keep) {
+  sm <- summary(model)
+  cf <- as.data.frame(sm$coefficients)
+  cf$term <- rownames(cf)
+  rownames(cf) <- NULL
+  names(cf) <- c("estimate", "std_error", "statistic", "p_value", "term")
+  cf <- cf[cf$term %in% terms_keep, c("term", "estimate", "std_error", "p_value")]
+  cf
+}
+
+terms_sml <- rownames(summary(m_cotiza_lpm)$coefficients)
+terms_sml <- terms_sml[grepl("^ingoc1sml_cat", terms_sml)]
+
+tab_qb <- extract_coef(m_cotiza_qb, terms_sml)
+tab_lpm <- extract_coef(m_cotiza_lpm, terms_sml)
+
+tab <- dplyr::full_join(
+  dplyr::rename(tab_qb, qb_est = estimate, qb_se = std_error, qb_p = p_value),
+  dplyr::rename(tab_lpm, lpm_est = estimate, lpm_se = std_error, lpm_p = p_value),
+  by = "term"
+) %>%
+  mutate(
+    term = gsub("\\.", " ", term),
+    term = sub("^ingoc1sml_cat", "", term)
+  ) %>%
+  mutate(
+    qb_est = round(qb_est, 4), qb_se = round(qb_se, 4), qb_p = round(qb_p, 4),
+    lpm_est = round(lpm_est, 4), lpm_se = round(lpm_se, 4), lpm_p = round(lpm_p, 4)
+  )
+
+knitr::kable(
+  tab,
+  caption = "Efecto estimado (vs. 1 SML) sobre la probabilidad de cotizar: Quasi-binomial y LPM"
+)
+```
+
+# Event study (alrededor de ajustes del SML)
+
+```{r fig-es, fig.cap="Event study: formalidad alrededor de ajustes del SML"}
+fixest::iplot(
+  est1,
+  main = "Event study: formalidad alrededor de ajustes del SML",
+  xlab = "Trimestres relativos al ajuste (ref = -1)",
+  ylab = "Diferencia (pp) vs. ref"
+)
+```
+
+# Bunching / densidad alrededor del SML
+
+```{r fig-bunch, fig.cap="Masa salarial ponderada alrededor del SML"}
+g_bunch
+```
+

@@ -1,0 +1,22 @@
+.DS_Store
+.Rhistory
+.RData
+.Rproj.user/
+.Renviron
+
+# Resultados / caches
+output/
+cache/
+tmp/
+
+# Datos sensibles (microdatos)
+bases/*
+data/*
+
+# Mantener documentación de carpetas
+!bases/
+!bases/README.md
+!data/
+!data/README.md
+!data/personas/
+!data/personas/README.md
