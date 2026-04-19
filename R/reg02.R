@@ -11,7 +11,7 @@ read_reg02_files <- function(files, anios = NULL) {
 
     numeric_cols <- c(
       "upm","nvivi","nhoga","p02","p06","b10","anoest","area",
-      "tama_pea","e01aimde","rama_pea","fex_2022","factor","horab","horabc","estrato","dptorep","estgeo"
+      "tama_pea","e01aimde","rama_pea","fex_2022","factor","horab","horabc","estrato","d01","estgeo"
     )
     for (col in intersect(numeric_cols, names(df))) {
       df[[col]] <- safe_numeric(df[[col]])

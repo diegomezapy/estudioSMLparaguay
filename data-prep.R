@@ -73,7 +73,7 @@ db_app <- db %>%
     salario = salario,
     sal_hora = sal_hora,
     cotiza_bin, area_urb,
-    tam, rama_pea, ocup_pea, cate_pea,
+    tam, rama_pea, ocup_pea, cate_pea, dptorep = d01,
     w, sml, ratio_sml
   )
 readr::write_csv(db_app, OUT_APP)

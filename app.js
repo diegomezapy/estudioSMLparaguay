@@ -29,15 +29,15 @@ const DICT = {
     99: "No Especificado"
   },
   cate_pea: {
-    1: "Empleador o Patrón",
-    2: "Empleado Público",
-    3: "Empleado Privado",
-    4: "Cuenta Propia",
-    5: "Familiar No Remunerado",
-    6: "Empleado Doméstico",
-    7: "Jornalero",
-    8: "No Especificado",
-    9: "No Especificado"
+    1: "1 - Empleado/a", 2: "2 - Obrero/a", 3: "3 - Patrón/a",
+    4: "4 - Empleado/a público", 5: "5 - Cuenta propia", 6: "6 - Familiar no remun.",
+    7: "7 - Empleado/a doméstico", 8: "8 - Trabajador/a no remun.", 9: "9 - Otros"
+  },
+  dptorep: {
+    0: "Asunción", 1: "Concepción", 2: "San Pedro", 3: "Cordillera", 4: "Guairá",
+    5: "Caaguazú", 6: "Caazapá", 7: "Itapúa", 8: "Misiones", 9: "Paraguarí",
+    10: "Alto Paraná", 11: "Central", 12: "Ñeembucú", 13: "Amambay", 14: "Canindeyú",
+    15: "Presidente Hayes", 16: "Boquerón", 17: "Alto Paraguay"
   }
 };
 
@@ -58,6 +58,7 @@ const els = {
   tolVal: document.getElementById('tol-val'),
   yrMin: document.getElementById('filter-year-min'),
   yrMax: document.getElementById('filter-year-max'),
+  dpto: document.getElementById('filter-dpto'),
   rama: document.getElementById('filter-rama-group'),
   ocup: document.getElementById('filter-ocup-group'),
   cate: document.getElementById('filter-cate-group')
@@ -168,11 +169,26 @@ function processData(data) {
 
 function populateSelects(data) {
   const ramas = new Set(), ocups = new Set(), cates = new Set();
+  const dptos = new Set();
+  
+  window.geojsonData = null;
+  fetch('data/departamentos.geojson').then(r => r.json()).then(d => window.geojsonData = d).catch(e => console.error("No se pudo cargar el geojson", e));
+
   data.forEach(d => {
     if(d.rama_pea) ramas.add(d.rama_pea);
     if(d.ocup_pea) ocups.add(d.ocup_pea);
     if(d.cate_pea) cates.add(d.cate_pea);
+    if(d.dptorep !== undefined && d.dptorep !== null) dptos.add(d.dptorep);
   });
+
+  const addOptionsDpto = (el, set, type) => {
+    Array.from(set).sort((a,b)=>a-b).forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = getLabel(type, v);
+      el.appendChild(opt);
+    });
+  };
+  addOptionsDpto(els.dpto, dptos, 'dptorep');
 
   const addButtons = (el, set, type, name) => {
     Array.from(set).sort((a,b)=>a-b).forEach(v => {
@@ -202,6 +218,7 @@ function updateApp() {
   const yrMax = parseInt(els.yrMax.value);
   const sexo = document.querySelector('input[name="filter-sexo"]:checked').value;
   const area = document.querySelector('input[name="filter-area"]:checked').value;
+  const dpto = els.dpto.value;
   const rama = document.querySelector('input[name="filter-rama"]:checked').value;
   const ocup = document.querySelector('input[name="filter-ocup"]:checked').value;
   const cate = document.querySelector('input[name="filter-cate"]:checked').value;
@@ -216,8 +233,9 @@ function updateApp() {
     const d = rawData[i];
     if (d.anio < yrMin || d.anio > yrMax) continue;
     if (sexo !== "Todos" && d.sexo !== sexo) continue;
-    if (area !== "Todos" && String(d.area_urb) !== String(area)) continue;
-    if (rama !== "Todos" && String(d.rama_pea) !== String(rama)) continue;
+    if (area !== 'Todos' && String(d.area_urb) !== area) continue;
+    if (dpto !== 'Todos' && String(d.dptorep) !== dpto) continue;
+    if (rama !== 'Todos' && String(d.rama_pea) !== rama) continue;
     if (ocup !== "Todos" && String(d.ocup_pea) !== String(ocup)) continue;
     if (cate !== "Todos" && String(d.cate_pea) !== String(cate)) continue;
 
@@ -351,19 +369,157 @@ function drawPlots() {
       y: trimestres.map(t => { const fd = salData.find(d => d.trimestredesc===t && d.sexo===sexo); return fd ? fd.value : null; }),
       name: `Salario General (${sexo})`,
       type: 'scatter', mode: 'lines+markers',
-      line: { color: sexo === 'Hombres' ? '#3498DB' : '#E74C3C', width: 4 },
+      line: { color: sexo === 'Hombres' ? '#3498DB' : '#E74C3C', width: 4, shape: 'spline' },
       marker: { size: 10 }
     };
   });
   Plotly.newPlot('plot-sal', tracesSal, { margin: {t:20, b:40, l:60, r:10}, legend: {orientation: 'h', y: -0.2} }, {responsive: true});
 
-  // 4. Llenar Tabla Resumen
-  drawTable(franjas, generos);
+  // ================= TABLA RESUMEN ==================
+  drawTable(trimestres, generos);
+  
+  // ================= TAB DEMOGRAFIA ==================
+  drawDemografia(filteredData);
+  
+  // ================= TAB MAPAS ==================
+  drawMap(filteredData);
 }
 
-function drawTable(franjas, generos) {
+function drawDemografia(data) {
+  // Función auxiliar para nivel educativo
+  const getEducNivel = (anios) => {
+    if (anios < 7) return "Educación Básica";
+    if (anios < 13) return "Educación Media";
+    return "Educación Superior";
+  };
+  
+  // Función auxiliar para franja de edad
+  const getEdadFranja = (edad) => {
+    if (edad < 25) return "15-24 años";
+    if (edad < 35) return "25-34 años";
+    if (edad < 45) return "35-44 años";
+    if (edad < 55) return "45-54 años";
+    return "55+ años";
+  };
+
+  const educStats = { "Educación Básica": { w:0, wSal:0 }, "Educación Media": { w:0, wSal:0 }, "Educación Superior": { w:0, wSal:0 } };
+  const edadStats = {}; // { franjaSML: { "15-24": w, ... } }
+  
+  data.forEach(d => {
+    // Educacion
+    if (d.educacion !== undefined && d.educacion !== null) {
+      const niv = getEducNivel(d.educacion);
+      educStats[niv].w += d.w;
+      educStats[niv].wSal += d.salario * d.w;
+    }
+    // Edad
+    if (d.edad !== undefined && d.edad !== null) {
+      const franjaE = getEdadFranja(d.edad);
+      const franjaS = d.ingoc1sml_cat;
+      if (!edadStats[franjaS]) edadStats[franjaS] = {};
+      if (!edadStats[franjaS][franjaE]) edadStats[franjaS][franjaE] = 0;
+      edadStats[franjaS][franjaE] += d.w;
+    }
+  });
+
+  // Plot Distribución Nivel Educativo
+  const educLabels = ["Educación Básica", "Educación Media", "Educación Superior"];
+  const educVals = educLabels.map(l => educStats[l].w);
+  Plotly.newPlot('plot-educacion', [{
+    labels: educLabels, values: educVals, type: 'pie', hole: .4,
+    marker: { colors: ['#e67e22', '#f1c40f', '#2c3e50'] }
+  }], { margin: { t: 20, b: 20, l: 20, r: 20 } }, { responsive: true, displayModeBar: false });
+
+  // Plot Salario por Nivel Educativo
+  const educSal = educLabels.map(l => educStats[l].w > 0 ? (educStats[l].wSal / educStats[l].w) : 0);
+  Plotly.newPlot('plot-sal-educacion', [{
+    x: educLabels, y: educSal, type: 'bar', marker: { color: '#27ae60' }
+  }], {
+    margin: { t: 20, b: 40, l: 60, r: 20 },
+    yaxis: { tickformat: ',.0f' }
+  }, { responsive: true, displayModeBar: false });
+
+  // Plot Edad por Franja SML
+  const franjasSML = ['Menos de 1 SML', '1 SML', 'Más de 1 SML'];
+  const franjasEdad = ["15-24 años", "25-34 años", "35-44 años", "45-54 años", "55+ años"];
+  const tracesEdad = franjasEdad.map(fe => ({
+    name: fe,
+    x: franjasSML,
+    y: franjasSML.map(fs => edadStats[fs] && edadStats[fs][fe] ? edadStats[fs][fe] : 0),
+    type: 'bar'
+  }));
+  Plotly.newPlot('plot-edad', tracesEdad, {
+    barmode: 'stack', margin: { t: 20, b: 40, l: 60, r: 20 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function drawMap(data) {
+  if (!window.geojsonData) return;
+  
+  // Calcular salario promedio por departamento
+  const dptoStats = {};
+  data.forEach(d => {
+    if (d.dptorep === undefined || d.dptorep === null) return;
+    const dp = String(d.dptorep);
+    if (!dptoStats[dp]) dptoStats[dp] = { w:0, wSal:0 };
+    dptoStats[dp].w += d.w;
+    dptoStats[dp].wSal += d.salario * d.w;
+  });
+
+  const locations = [];
+  const z = [];
+  const text = [];
+  
+  // Enlazar con GeoJSON (NAME_1)
+  window.geojsonData.features.forEach(f => {
+    const name = f.properties.NAME_1;
+    // Buscar id de diccionario
+    let dptoId = null;
+    for (const [id, label] of Object.entries(DICT.dptorep)) {
+      if (name.includes(label) || label.includes(name)) {
+        dptoId = id; break;
+      }
+    }
+    
+    locations.push(name);
+    if (dptoId && dptoStats[dptoId] && dptoStats[dptoId].w > 0) {
+      const avg = dptoStats[dptoId].wSal / dptoStats[dptoId].w;
+      z.push(avg);
+      text.push(`${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', {maximumFractionDigits:0})} Gs.<br>Trabajadores ponderados: ${dptoStats[dptoId].w.toLocaleString('es-ES', {maximumFractionDigits:0})}`);
+    } else {
+      z.push(null);
+      text.push(`${name}<br>Sin datos suficientes`);
+    }
+  });
+
+  const trace = {
+    type: "choroplethmapbox",
+    geojson: window.geojsonData,
+    locations: locations,
+    featureidkey: "properties.NAME_1",
+    z: z,
+    text: text,
+    hoverinfo: "text",
+    colorscale: "Viridis",
+    marker: { opacity: 0.7, line: { width: 1, color: "white" } }
+  };
+
+  const layout = {
+    mapbox: {
+      style: "carto-positron",
+      center: { lon: -58.0, lat: -23.5 },
+      zoom: 4.5
+    },
+    margin: { t: 0, b: 0, l: 0, r: 0 }
+  };
+
+  Plotly.newPlot('plot-mapa', [trace], layout, { responsive: true, displayModeBar: false });
+}
+
+function drawTable(trimestres, generos) {
   const tbody = document.getElementById('summary-table-body');
   let html = '';
+  const franjas = ["Menos de 1 SML", "1 SML", "Más de 1 SML"];
   
   generos.forEach(sexo => {
     let rowSpanAdded = false;

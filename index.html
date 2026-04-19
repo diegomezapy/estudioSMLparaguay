@@ -13,12 +13,12 @@
 
 <div class="d-flex" id="wrapper">
   <!-- Sidebar -->
-  <div class="bg-white border-end" id="sidebar-wrapper">
-    <div class="sidebar-heading border-bottom p-3">
+  <div class="bg-white border-end d-flex flex-column" id="sidebar-wrapper" style="max-height: 100vh;">
+    <div class="sidebar-heading border-bottom p-3 flex-shrink-0">
       <strong>SML Paraguay — Dashboard EPHC</strong>
     </div>
     
-    <div class="p-3">
+    <div class="p-3 overflow-auto flex-grow-1">
       <!-- Información -->
       <div class="card mb-3">
         <div class="card-header bg-light">Información</div>
@@ -57,7 +57,7 @@
           </div>
           
           <label class="form-label mt-3 d-block">Área Geográfica</label>
-          <div class="btn-group w-100" role="group" id="filter-area-group">
+          <div class="btn-group w-100 mb-3" role="group" id="filter-area-group">
             <input type="radio" class="btn-check" name="filter-area" id="area-todos" value="Todos" checked>
             <label class="btn btn-outline-success btn-sm" for="area-todos">Ambas</label>
             <input type="radio" class="btn-check" name="filter-area" id="area-urb" value="1">
@@ -65,6 +65,12 @@
             <input type="radio" class="btn-check" name="filter-area" id="area-rur" value="0">
             <label class="btn btn-outline-success btn-sm" for="area-rur">Rural</label>
           </div>
+          
+          <label class="form-label d-block text-warning fw-bold"><i class="fas fa-map-marker-alt"></i> Departamento</label>
+          <select class="form-select form-select-sm border-warning" id="filter-dpto">
+            <option value="Todos">Todos (Nacional)</option>
+          </select>
+          <div class="form-text text-muted" style="font-size:0.7rem;">⚠️ Al filtrar por Dpto, algunos cruces pueden perder representatividad estadística.</div>
         </div>
       </div>
       
@@ -100,13 +106,15 @@
 
       <!-- Autor y Contacto -->
       <div class="mt-4 p-3 bg-light rounded text-center small border">
-        <p class="mb-1 fw-bold text-dark">Diego Bernardo Meza Bogado</p>
-        <p class="mb-2 text-muted">Consultor Económico y Estadístico</p>
+        <p class="mb-1 fw-bold text-dark">Diego Bernardo Meza</p>
+        <p class="mb-2 text-muted">Estadístico</p>
         <div class="d-flex justify-content-center gap-3 mb-3">
-          <a href="https://github.com/diegomezapy" target="_blank" class="text-decoration-none text-dark"><i class="fab fa-github fa-lg"></i></a>
-          <a href="mailto:dmeza.py@gmail.com" class="text-decoration-none text-danger"><i class="fas fa-envelope fa-lg"></i></a>
-          <a href="#" class="text-decoration-none text-primary"><i class="fab fa-linkedin fa-lg"></i></a>
+          <a href="https://github.com/diegomezapy" target="_blank" class="text-decoration-none text-dark" title="GitHub"><i class="fab fa-github fa-lg"></i></a>
+          <a href="mailto:dmeza.py@gmail.com" class="text-decoration-none text-danger" title="Email"><i class="fas fa-envelope fa-lg"></i></a>
+          <a href="https://wa.me/595971100835" target="_blank" class="text-decoration-none text-success" title="WhatsApp"><i class="fab fa-whatsapp fa-lg"></i></a>
         </div>
+        <p class="text-muted small mb-0"><i class="fas fa-envelope"></i> dmeza.py@gmail.com</p>
+        <p class="text-muted small mb-2"><i class="fas fa-phone"></i> +595 971 100835</p>
         <hr class="my-2">
         <div class="text-start text-muted" style="font-size: 0.75rem;">
           <strong>Aviso de Responsabilidad:</strong> Los datos presentados se derivan de la Encuesta Permanente de Hogares Continua (EPHC - INE). Este tablero es una herramienta analítica independiente y sus resultados e interpretaciones no representan una postura oficial del Instituto Nacional de Estadística. Se recomienda precaución al interpretar estimaciones con tamaños de muestra reducidos tras aplicar múltiples filtros.
@@ -116,12 +124,18 @@
   </div>
 
   <!-- Page Content -->
-  <div id="page-content-wrapper">
+  <div id="page-content-wrapper" class="overflow-auto" style="height: 100vh;">
     <div class="container-fluid p-4" id="main-content" style="display: none;">
       <!-- Nav tabs -->
       <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
         <li class="nav-item" role="presentation">
-          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#resumen" type="button" role="tab">Resumen</button>
+          <button class="nav-link active fw-bold" id="resumen-tab" data-bs-toggle="tab" data-bs-target="#resumen" type="button" role="tab"><i class="fas fa-home"></i> Resumen</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark" id="demografia-tab" data-bs-toggle="tab" data-bs-target="#demografia" type="button" role="tab"><i class="fas fa-graduation-cap"></i> Demografía</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark" id="mapas-tab" data-bs-toggle="tab" data-bs-target="#mapas" type="button" role="tab"><i class="fas fa-map-marked-alt"></i> Mapas Departamentales</button>
         </li>
       </ul>
 
@@ -280,8 +294,91 @@
             </div>
           </div>
 
+        </div> <!-- /resumen tab -->
+
+        <!-- TAB DEMOGRAFIA -->
+        <div class="tab-pane" id="demografia" role="tabpanel">
+          <div class="row mb-4">
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-3">
+                  <h5 class="card-title mb-0">Distribución por Nivel Educativo</h5>
+                </div>
+                <div class="card-body p-0">
+                  <div id="plot-educacion" style="height: 360px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-3">
+                  <h5 class="card-title mb-0">Salario Promedio por Nivel Educativo</h5>
+                </div>
+                <div class="card-body p-0">
+                  <div id="plot-sal-educacion" style="height: 360px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row mb-4">
+            <div class="col-md-12">
+              <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-3">
+                  <h5 class="card-title mb-0">Composición de Franjas Salariales por Edad</h5>
+                </div>
+                <div class="card-body p-0">
+                  <div id="plot-edad" style="height: 400px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- /demografia tab -->
+
+        <!-- TAB MAPAS -->
+        <div class="tab-pane" id="mapas" role="tabpanel">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-1"></i> Selecciona un trimestre en particular desde los filtros temporales si deseas ver el corte estricto de ese momento. El mapa mostrará el <strong>Salario Mensual Promedio</strong> ponderado por departamento.
+          </div>
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom-0 pt-3">
+              <h5 class="card-title mb-0">Mapa de Calor: Salario Promedio Departamental</h5>
+            </div>
+            <div class="card-body p-0">
+              <div id="plot-mapa" style="height: 600px;"></div>
+            </div>
+          </div>
+        </div> <!-- /mapas tab -->
+
+      </div>
+
+      <!-- SECCIÓN DE COMENTARIOS -->
+      <hr class="my-5">
+      <div class="row mt-5">
+        <div class="col-12">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-bold"><i class="fas fa-comments text-primary me-2"></i> Discusión y Comentarios</div>
+            <div class="card-body">
+              <p class="text-muted small">Inicia sesión con tu cuenta de GitHub para dejar tu opinión o sugerencia sobre los resultados de este dashboard.</p>
+              <script src="https://giscus.app/client.js"
+                data-repo="diegomezapy/estudioSMLparaguay"
+                data-repo-id="R_kgDOMmE16Q"
+                data-category="Announcements"
+                data-category-id="DIC_kwDOMmE16c4CiK9N"
+                data-mapping="pathname"
+                data-strict="0"
+                data-reactions-enabled="1"
+                data-emit-metadata="0"
+                data-input-position="bottom"
+                data-theme="light"
+                data-lang="es"
+                crossorigin="anonymous"
+                async>
+              </script>
+            </div>
+          </div>
         </div>
       </div>
+
     </div>
     
     <!-- Loading Screen -->
