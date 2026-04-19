@@ -6,6 +6,7 @@ cat("📦 Preparar datos: source('data-prep.R')\n")
 cat("\n")
 
 options(
+  repos = c(CRAN = "https://cloud.r-project.org"),
   digits = 4,
   width = 120,
   scipen = 10,
