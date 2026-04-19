@@ -270,7 +270,7 @@ function updateKPIs(sumWTotal) {
   document.getElementById('kpi-n').textContent = formatGs(sumWTotal);
   
   const salGen = calcWMean(filteredData, 'salario_plot', 'w');
-  els.salarioProm.innerHTML = salGen ? `Gs. ${salGen.toLocaleString('es-ES', {maximumFractionDigits:0})}` : '-';
+  document.getElementById('kpi-sal').textContent = formatGs(salGen);
   
   const formalPct = calcWMean(filteredData, 'cotiza_bin', 'w') * 100;
   document.getElementById('kpi-formal').textContent = formalPct.toFixed(1) + "%";
