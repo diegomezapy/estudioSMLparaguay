@@ -12,6 +12,7 @@ tmp/
 # Datos sensibles (microdatos)
 bases/*
 data/*.csv
+!data/db_app.csv
 data/personas/*
 
 # Mantener documentación de carpetas

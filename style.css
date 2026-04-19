@@ -1,0 +1,50 @@
+body {
+  overflow-x: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#wrapper {
+  display: flex;
+  width: 100%;
+}
+
+#sidebar-wrapper {
+  min-height: 100vh;
+  width: 360px;
+  position: fixed;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+#page-content-wrapper {
+  min-width: 0;
+  width: calc(100% - 360px);
+  margin-left: 360px;
+}
+
+.card {
+  border-radius: 0.5rem;
+}
+
+.fs-1 {
+  font-size: 2.5rem;
+}
+
+.opacity-50 {
+  opacity: 0.5;
+}
+
+/* Scrollbar styling for sidebar */
+#sidebar-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+#sidebar-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+#sidebar-wrapper::-webkit-scrollbar-thumb {
+  background: #ccc; 
+  border-radius: 3px;
+}
+#sidebar-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #aaa; 
+}
