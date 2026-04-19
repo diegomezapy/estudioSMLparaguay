@@ -46,10 +46,33 @@ build_sml_monthly <- function(sml_data, end_date = NULL) {
   if (is.null(end_date)) {
     end_date <- as.Date(paste0(max(sml_data$year, na.rm = TRUE), "-12-01"))
   }
+  
+  # Puntos de IPC conocidos (Base Diciembre 2021 = 100) según BCP
+  ipc_ref <- tibble::tribble(
+    ~fecha, ~ipc,
+    as.Date("2021-12-01"), 100.0,
+    as.Date("2022-12-01"), 108.1,
+    as.Date("2023-12-01"), 112.10,
+    as.Date("2024-12-01"), 116.36,
+    as.Date("2025-12-01"), 119.96,
+    as.Date("2026-12-01"), 123.56
+  )
+
   serie_mensual <- tibble::tibble(fecha = seq.Date(as.Date("1980-01-01"), end_date, by = "month"))
-  serie_mensual %>%
+  
+  serie_mensual <- serie_mensual %>%
     dplyr::left_join(dplyr::select(sml_data, fecha, sml), by = "fecha") %>%
     tidyr::fill(sml, .direction = "down")
+    
+  # Interpolar IPC linealmente para todos los meses
+  ipc_interp <- approx(x = as.numeric(ipc_ref$fecha), y = ipc_ref$ipc, 
+                       xout = as.numeric(serie_mensual$fecha), rule = 2)$y
+  serie_mensual$ipc <- ipc_interp
+  
+  # Calcular SML Real (Deflactado, base 2021)
+  serie_mensual$sml_real <- serie_mensual$sml / (serie_mensual$ipc / 100)
+  
+  serie_mensual
 }
 
 add_sml_to_db <- function(db, sml_monthly) {

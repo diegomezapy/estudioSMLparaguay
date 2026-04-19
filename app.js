@@ -145,7 +145,13 @@ function processData(data) {
   });
   
   document.querySelectorAll('.filter-q').forEach(el => el.addEventListener('change', updateApp));
-  document.querySelectorAll('input[name="filter-sexo"]').forEach(el => el.addEventListener('change', updateApp));
+  document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => {
+    if (el.id !== 'toggle-real') {
+      el.addEventListener('change', updateApp);
+    }
+  });
+  
+  document.getElementById('toggle-real').addEventListener('change', updateApp);
   document.querySelectorAll('input[name="filter-area"]').forEach(el => el.addEventListener('change', updateApp));
   
   document.getElementById('btn-reset').addEventListener('click', () => {
@@ -159,6 +165,7 @@ function processData(data) {
     document.getElementById('rama-todos').checked = true;
     document.getElementById('ocup-todos').checked = true;
     document.getElementById('cate-todos').checked = true;
+    document.getElementById('toggle-real').checked = false;
     updateApp();
   });
 
@@ -216,6 +223,7 @@ function updateApp() {
   const cate = document.querySelector('input[name="filter-cate"]:checked').value;
   
   const selectedQs = Array.from(document.querySelectorAll('.filter-q:checked')).map(el => parseInt(el.value));
+  const isReal = document.getElementById('toggle-real').checked;
 
   const lo = 1 - tol;
   const hi = 1 + tol;
@@ -231,12 +239,21 @@ function updateApp() {
     if (area !== 'Todos' && String(d.area_urb) !== area) continue;
     if (dpto !== 'Todos' && String(d.dptorep) !== dpto) continue;
     if (rama !== 'Todos' && String(d.rama_pea) !== rama) continue;
-    if (ocup !== "Todos" && String(d.ocup_pea) !== String(ocup)) continue;
-    if (cate !== "Todos" && String(d.cate_pea) !== String(cate)) continue;
+    if (ocup !== 'Todos' && String(d.ocup_pea) !== String(ocup)) continue;
+    if (cate !== 'Todos' && String(d.cate_pea) !== String(cate)) continue;
+
+    // Calcular variables en tiempo de ejecución (Real vs Nominal)
+    d.salario_plot = isReal ? d.salario / (d.ipc / 100) : d.salario;
+    d.sml_plot = isReal ? d.sml_real : d.sml;
+
+    // Actualizar ratio_sml en base al SML
+    d.ratio_sml_plot = d.salario_plot / d.sml_plot;
+
+    if (d.ratio_sml_plot < lo || d.ratio_sml_plot > hi) continue;
 
     // Calcular franja dinámicamente
-    if (d.ratio_sml < lo) d.ingoc1sml_cat = "Menos de 1 SML";
-    else if (d.ratio_sml > hi) d.ingoc1sml_cat = "Más de 1 SML";
+    if (d.ratio_sml_plot < lo) d.ingoc1sml_cat = "Menos de 1 SML";
+    else if (d.ratio_sml_plot > hi) d.ingoc1sml_cat = "Más de 1 SML";
     else d.ingoc1sml_cat = "1 SML";
 
     filteredData.push(d);
@@ -252,8 +269,8 @@ function updateApp() {
 function updateKPIs(sumWTotal) {
   document.getElementById('kpi-n').textContent = formatGs(sumWTotal);
   
-  const salGen = calcWMean(filteredData, 'salario', 'w');
-  document.getElementById('kpi-sal').textContent = formatGs(salGen);
+  const salGen = calcWMean(filteredData, 'salario_plot', 'w');
+  els.salarioProm.innerHTML = salGen ? `Gs. ${salGen.toLocaleString('es-ES', {maximumFractionDigits:0})}` : '-';
   
   const formalPct = calcWMean(filteredData, 'cotiza_bin', 'w') * 100;
   document.getElementById('kpi-formal').textContent = formalPct.toFixed(1) + "%";
@@ -262,8 +279,8 @@ function updateKPIs(sumWTotal) {
   document.getElementById('kpi-share1').textContent = share1Pct.toFixed(1) + "%";
 
   // Brecha Salarial
-  const salH = calcWMean(filteredData.filter(d => d.sexo === "Hombres"), 'salario', 'w');
-  const salM = calcWMean(filteredData.filter(d => d.sexo === "Mujeres"), 'salario', 'w');
+  const salH = calcWMean(filteredData.filter(d => d.sexo === "Hombres"), 'salario_plot', 'w');
+  const salM = calcWMean(filteredData.filter(d => d.sexo === "Mujeres"), 'salario_plot', 'w');
   if(salH > 0 && salM > 0) {
     const brecha = ((salH - salM) / salH) * 100;
     document.getElementById('kpi-brecha').textContent = brecha.toFixed(1) + "%";
@@ -340,7 +357,7 @@ function drawPlots() {
   });
   Plotly.newPlot('plot-dist', tracesDist, { barmode: 'stack', margin: {t:20, b:60, l:40, r:10}, legend: {orientation: 'h', y: -0.3} }, {responsive: true});
 
-  // 2. Formalidad (ahora como barras agrupadas, al igual que distribución)
+  // 2. Formalidad
   const formData = groupData(filteredData, ['trimestredesc', 'ingoc1sml_cat', 'sexo'], (items, wSum) => calcWMean(items, 'cotiza_bin', 'w') * 100);
   const tracesForm = [];
   franjas.forEach(franja => {
@@ -357,7 +374,21 @@ function drawPlots() {
   Plotly.newPlot('plot-formal', tracesForm, { barmode: 'group', margin: {t:20, b:60, l:40, r:10}, legend: {orientation: 'h', y: -0.3} }, {responsive: true});
 
   // 3. Salario Promedio
-  const salData = groupData(filteredData, ['trimestredesc', 'sexo'], (items, wSum) => calcWMean(items, 'salario', 'w'));
+  const salData = groupData(filteredData, ['trimestredesc', 'sexo'], (items, wSum) => calcWMean(items, 'salario_plot', 'w'));
+  
+  const isReal = document.getElementById('toggle-real').checked;
+  const smlName = isReal ? "Salario Mínimo Real (Base Dic 2021)" : "Salario Mínimo Nominal";
+  
+  const smlLine = {
+    name: smlName,
+    x: trimestres,
+    y: trimestres.map(t => {
+      const p = filteredData.find(d => d.trimestredesc === t);
+      return p ? p.sml_plot : null;
+    }),
+    type: 'scatter', mode: 'lines', line: { color: '#7f8c8d', dash: 'dash' }
+  };
+
   const tracesSal = generos.map(sexo => {
     return {
       x: trimestres,
@@ -368,6 +399,7 @@ function drawPlots() {
       marker: { size: 10 }
     };
   });
+  tracesSal.push(smlLine);
   Plotly.newPlot('plot-sal', tracesSal, { margin: {t:20, b:40, l:60, r:10}, legend: {orientation: 'h', y: -0.2} }, {responsive: true});
 
   // ================= TABLA RESUMEN ==================
@@ -410,7 +442,7 @@ function drawDemografia(data, trimestres) {
     if (d.educacion !== undefined && d.educacion !== null) {
       const niv = getEducNivel(d.educacion);
       educStats[t][niv].w += d.w;
-      educStats[t][niv].wSal += d.salario * d.w;
+      educStats[t][niv].wSal += d.salario_plot * d.w;
     }
     // Edad
     if (d.edad !== undefined && d.edad !== null) {
@@ -524,7 +556,7 @@ function drawTable(trimestres, generos) {
     franjas.forEach(franja => {
       const items = filteredData.filter(d => d.sexo === sexo && d.ingoc1sml_cat === franja);
       let sumW = 0; items.forEach(d => sumW += (d.w||0));
-      const sal = calcWMean(items, 'salario', 'w');
+      const sal = calcWMean(items, 'salario_plot', 'w');
       const form = calcWMean(items, 'cotiza_bin', 'w') * 100;
       
       html += `<tr>`;
