@@ -180,17 +180,7 @@ function populateSelects(data) {
     if(d.rama_pea) ramas.add(d.rama_pea);
     if(d.ocup_pea) ocups.add(d.ocup_pea);
     if(d.cate_pea) cates.add(d.cate_pea);
-    if(d.dptorep !== undefined && d.dptorep !== null) dptos.add(d.dptorep);
   });
-
-  const addOptionsDpto = (el, set, type) => {
-    Array.from(set).sort((a,b)=>a-b).forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v; opt.textContent = getLabel(type, v);
-      el.appendChild(opt);
-    });
-  };
-  addOptionsDpto(els.dpto, dptos, 'dptorep');
 
   const addButtons = (el, set, type, name) => {
     Array.from(set).sort((a,b)=>a-b).forEach(v => {
@@ -462,9 +452,9 @@ function drawDemografia(data, trimestres) {
 }
 
 function drawMap(data) {
-  if (!window.geojsonData) return;
-  
-  // Calcular salario promedio por departamento
+  Plotly.purge('plot-mapa');
+  document.getElementById('plot-mapa').innerHTML = '<div class="d-flex align-items-center justify-content-center h-100 text-muted"><p>En desarrollo...</p></div>';
+  return;
   const dptoStats = {};
   data.forEach(d => {
     if (d.dptorep === undefined || d.dptorep === null) return;
