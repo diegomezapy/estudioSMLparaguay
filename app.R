@@ -39,9 +39,9 @@ COL_SML <- c(
 theme_sml <- bs_theme(
   version = 5,
   bootswatch = "flatly",
-  base_font = font_face("system-ui"),
-  heading_font = font_face("system-ui"),
-  code_font = font_face("ui-monospace")
+  base_font = "system-ui",
+  heading_font = "system-ui",
+  code_font = "ui-monospace"
 )
 
 plot_theme <- function() {
