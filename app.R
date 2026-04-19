@@ -15,6 +15,8 @@ suppressPackageStartupMessages({
   library(plotly)
   library(DT)
   library(scales)
+  library(survey)
+  library(fixest)
 })
 
 APP_DIR <- getwd()
