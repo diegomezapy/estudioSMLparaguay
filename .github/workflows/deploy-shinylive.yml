@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          Rscript -e 'install.packages(c("shinylive", "httpuv"))'
+          Rscript -e 'install.packages(c("shinylive", "httpuv"), repos="https://packagemanager.posit.co/cran/__linux__/jammy/latest")'
 
       - name: Build Shinylive app
         run: |
