@@ -91,8 +91,8 @@
       <div class="tab-content">
         <div class="tab-pane active" id="resumen" role="tabpanel">
           <!-- KPIs -->
-          <div class="row mb-4">
-            <div class="col-md-3">
+          <div class="row mb-3">
+            <div class="col-md-4 mb-3">
               <div class="card text-white bg-primary h-100 shadow-sm">
                 <div class="card-body d-flex align-items-center">
                   <div class="me-3 fs-1"><i class="fas fa-users opacity-50"></i></div>
@@ -103,77 +103,145 @@
                 </div>
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4 mb-3">
               <div class="card text-white bg-success h-100 shadow-sm">
                 <div class="card-body d-flex align-items-center">
                   <div class="me-3 fs-1"><i class="fas fa-money-bill-wave opacity-50"></i></div>
                   <div>
-                    <h6 class="card-title mb-0">Salario promedio (Gs.)</h6>
+                    <h6 class="card-title mb-0">Salario Promedio General</h6>
                     <h3 class="mb-0 fw-bold" id="kpi-sal">-</h3>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4 mb-3">
+              <div class="card text-white bg-danger h-100 shadow-sm">
+                <div class="card-body d-flex align-items-center">
+                  <div class="me-3 fs-1"><i class="fas fa-venus-mars opacity-50"></i></div>
+                  <div>
+                    <h6 class="card-title mb-0">Brecha Salarial (H vs M)</h6>
+                    <h3 class="mb-0 fw-bold" id="kpi-brecha">-</h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row mb-4">
+            <div class="col-md-4 mb-3">
               <div class="card text-white bg-warning h-100 shadow-sm">
                 <div class="card-body d-flex align-items-center">
                   <div class="me-3 fs-1"><i class="fas fa-briefcase opacity-50"></i></div>
                   <div>
-                    <h6 class="card-title mb-0">Formalidad (cotiza)</h6>
+                    <h6 class="card-title mb-0">Formalidad (Aporta a IPS)</h6>
                     <h3 class="mb-0 fw-bold" id="kpi-formal">-</h3>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4 mb-3">
               <div class="card text-white bg-info h-100 shadow-sm">
                 <div class="card-body d-flex align-items-center">
                   <div class="me-3 fs-1"><i class="fas fa-chart-pie opacity-50"></i></div>
                   <div>
-                    <h6 class="card-title mb-0">Franja 1 SML</h6>
+                    <h6 class="card-title mb-0">Población en 1 SML</h6>
                     <h3 class="mb-0 fw-bold" id="kpi-share1">-</h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <div class="card text-dark bg-light border-danger border-2 h-100 shadow-sm">
+                <div class="card-body d-flex align-items-center">
+                  <div class="me-3 fs-1 text-danger"><i class="fas fa-exclamation-triangle opacity-50"></i></div>
+                  <div>
+                    <h6 class="card-title mb-0 text-danger fw-bold">Informalidad Crítica</h6>
+                    <small class="text-muted lh-1 d-block mb-1">&lt; 1 SML y Sin IPS</small>
+                    <h3 class="mb-0 fw-bold text-danger" id="kpi-critico">-</h3>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
+          <!-- Metodología -->
+          <div class="alert alert-secondary small py-2 mb-4">
+            <i class="fas fa-info-circle me-1"></i> <strong>Nota metodológica:</strong> Los datos presentados excluyen a menores de 15 años, personas inactivas y trabajadores familiares no remunerados. Representan exclusivamente a la Población Económicamente Activa (PEA) ocupada y remunerada.
+          </div>
+
           <!-- Gráficos -->
           <div class="row mb-4">
-            <div class="col-md-6">
+            <div class="col-md-6 mb-4">
               <div class="card h-100 shadow-sm border-0">
                 <div class="card-header bg-white border-bottom-0 pt-3">
-                  <h5 class="card-title mb-0">Distribución por franja (ponderado)</h5>
+                  <h5 class="card-title mb-0">Distribución por Franja Salarial (Hombres vs Mujeres)</h5>
                 </div>
                 <div class="card-body p-0">
-                  <div id="plot-dist" style="height: 340px;"></div>
+                  <div id="plot-dist" style="height: 360px;"></div>
+                </div>
+                <div class="card-footer bg-light text-muted small border-top-0">
+                  <i class="fas fa-lightbulb text-warning"></i> <strong>Interpretación:</strong> Observa cómo las mujeres tienden a concentrarse desproporcionadamente en la franja de "Menos de 1 SML" en comparación a los hombres.
                 </div>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6 mb-4">
               <div class="card h-100 shadow-sm border-0">
                 <div class="card-header bg-white border-bottom-0 pt-3">
-                  <h5 class="card-title mb-0">Formalidad por franja (ponderado)</h5>
+                  <h5 class="card-title mb-0">Formalidad por Franja (Aporte a IPS)</h5>
                 </div>
                 <div class="card-body p-0">
-                  <div id="plot-formal" style="height: 340px;"></div>
+                  <div id="plot-formal" style="height: 360px;"></div>
+                </div>
+                <div class="card-footer bg-light text-muted small border-top-0">
+                  <i class="fas fa-lightbulb text-warning"></i> <strong>Interpretación:</strong> La formalidad cae drásticamente en las franjas de menores ingresos. Los trabajadores que ganan menos del mínimo rara vez cuentan con seguro social.
                 </div>
               </div>
             </div>
           </div>
           
-          <div class="row">
+          <div class="row mb-4">
             <div class="col-12">
               <div class="card h-100 shadow-sm border-0">
                 <div class="card-header bg-white border-bottom-0 pt-3">
-                  <h5 class="card-title mb-0">Salario promedio por franja y género (ponderado)</h5>
+                  <h5 class="card-title mb-0">Evolución del Salario Promedio por Género</h5>
                 </div>
                 <div class="card-body p-0">
-                  <div id="plot-sal" style="height: 380px;"></div>
+                  <div id="plot-sal" style="height: 400px;"></div>
+                </div>
+                <div class="card-footer bg-light text-muted small border-top-0">
+                  <i class="fas fa-lightbulb text-warning"></i> <strong>Interpretación:</strong> La brecha salarial absoluta se hace evidente al trazar los promedios a lo largo del tiempo. Las mujeres sistemáticamente perciben salarios promedios inferiores.
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- Tabla Resumen -->
+          <div class="row">
+            <div class="col-12">
+              <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom pt-3">
+                  <h5 class="card-title mb-0">Resumen Detallado por Género y Franja</h5>
+                </div>
+                <div class="card-body table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Género</th>
+                        <th>Franja Salarial</th>
+                        <th class="text-end">Población Aprox.</th>
+                        <th class="text-end">Salario Promedio (Gs.)</th>
+                        <th class="text-end">Formalidad (IPS)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="summary-table-body">
+                      <!-- Llenado dinámico -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

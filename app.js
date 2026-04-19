@@ -90,7 +90,8 @@ function processData(data) {
 
   populateSelects(rawData);
   
-  els.spinner.style.display = 'none';
+  els.bar.parentElement.style.display = 'none';
+  els.spinner.remove(); // Elimina el cartel central por completo
   els.main.style.display = 'block';
   
   // Asignar listeners
@@ -168,12 +169,29 @@ function updateApp() {
 
 function updateKPIs(sumWTotal) {
   document.getElementById('kpi-n').textContent = formatGs(sumWTotal);
-  document.getElementById('kpi-sal').textContent = formatGs(calcWMean(filteredData, 'salario', 'w'));
+  
+  const salGen = calcWMean(filteredData, 'salario', 'w');
+  document.getElementById('kpi-sal').textContent = formatGs(salGen);
+  
   const formalPct = calcWMean(filteredData, 'cotiza_bin', 'w') * 100;
   document.getElementById('kpi-formal').textContent = formalPct.toFixed(1) + "%";
   
   const share1Pct = calcWShare(filteredData, d => d.ingoc1sml_cat === "1 SML", 'w') * 100;
   document.getElementById('kpi-share1').textContent = share1Pct.toFixed(1) + "%";
+
+  // Brecha Salarial
+  const salH = calcWMean(filteredData.filter(d => d.sexo === "Hombres"), 'salario', 'w');
+  const salM = calcWMean(filteredData.filter(d => d.sexo === "Mujeres"), 'salario', 'w');
+  if(salH > 0 && salM > 0) {
+    const brecha = ((salH - salM) / salH) * 100;
+    document.getElementById('kpi-brecha').textContent = brecha.toFixed(1) + "%";
+  } else {
+    document.getElementById('kpi-brecha').textContent = "-";
+  }
+
+  // Informalidad Crítica (<1 SML y sin IPS)
+  const pctCritico = calcWShare(filteredData, d => d.ingoc1sml_cat === "Menos de 1 SML" && d.cotiza_bin === 0, 'w') * 100;
+  document.getElementById('kpi-critico').textContent = pctCritico.toFixed(1) + "%";
 }
 
 const COL_SML = {
@@ -206,64 +224,101 @@ function drawPlots() {
     Plotly.purge('plot-dist');
     Plotly.purge('plot-formal');
     Plotly.purge('plot-sal');
+    document.getElementById('summary-table-body').innerHTML = '';
     return;
   }
 
-  // Ordenamos los trimestres (anio + q) de forma alfabética (2022Trim1, 2022Trim2, etc.)
   const trimestres = Array.from(new Set(filteredData.map(d => d.trimestredesc))).sort();
-
   const franjas = ["Menos de 1 SML", "1 SML", "Más de 1 SML"];
+  const generos = ["Hombres", "Mujeres"];
 
-  // 1. Distribución
-  const distData = groupData(filteredData, ['trimestredesc', 'ingoc1sml_cat'], (items, wSum) => wSum);
-  // Calcular % por trimestre
-  const trimTotals = {};
-  distData.forEach(d => { trimTotals[d.trimestredesc] = (trimTotals[d.trimestredesc]||0) + d.value; });
-  distData.forEach(d => { d.pct = (d.value / trimTotals[d.trimestredesc]) * 100; });
-
-  const tracesDist = franjas.map(franja => {
-    return {
-      x: trimestres,
-      y: trimestres.map(t => { const fd = distData.find(d => d.trimestredesc===t && d.ingoc1sml_cat===franja); return fd ? fd.pct : 0; }),
-      name: franja,
-      type: 'bar',
-      marker: { color: COL_SML[franja] }
-    };
+  // 1. Distribución Segmentada por Género
+  const distData = groupData(filteredData, ['trimestredesc', 'ingoc1sml_cat', 'sexo'], (items, wSum) => wSum);
+  const trimSexoTotals = {};
+  distData.forEach(d => {
+    const key = d.trimestredesc + '|' + d.sexo;
+    trimSexoTotals[key] = (trimSexoTotals[key]||0) + d.value;
   });
-  Plotly.newPlot('plot-dist', tracesDist, { barmode: 'stack', margin: {t:20, b:40, l:40, r:10}, legend: {orientation: 'h', y: -0.2} }, {responsive: true});
-
-  // 2. Formalidad
-  const formData = groupData(filteredData, ['trimestredesc', 'ingoc1sml_cat'], (items, wSum) => calcWMean(items, 'cotiza_bin', 'w') * 100);
-  const tracesForm = franjas.map(franja => {
-    return {
-      x: trimestres,
-      y: trimestres.map(t => { const fd = formData.find(d => d.trimestredesc===t && d.ingoc1sml_cat===franja); return fd ? fd.value : null; }),
-      name: franja,
-      type: 'scatter', mode: 'lines+markers',
-      marker: { color: COL_SML[franja], size: 8 },
-      line: { width: 3 }
-    };
+  distData.forEach(d => { 
+    const key = d.trimestredesc + '|' + d.sexo;
+    d.pct = trimSexoTotals[key] > 0 ? (d.value / trimSexoTotals[key]) * 100 : 0; 
   });
-  Plotly.newPlot('plot-formal', tracesForm, { margin: {t:20, b:40, l:40, r:10}, legend: {orientation: 'h', y: -0.2} }, {responsive: true});
 
-  // 3. Salario promedio por género y franja
-  const salData = groupData(filteredData, ['trimestredesc', 'ingoc1sml_cat', 'sexo'], (items, wSum) => calcWMean(items, 'salario', 'w'));
-  const tracesSal = [];
+  const tracesDist = [];
   franjas.forEach(franja => {
-    ['Hombres', 'Mujeres'].forEach(sexo => {
-      const isHombre = sexo === 'Hombres';
-      tracesSal.push({
-        x: trimestres,
-        y: trimestres.map(t => { const fd = salData.find(d => d.trimestredesc===t && d.ingoc1sml_cat===franja && d.sexo===sexo); return fd ? fd.value : null; }),
+    generos.forEach(sexo => {
+      tracesDist.push({
+        x: trimestres.map(t => `${t}<br>${sexo.charAt(0)}`),
+        y: trimestres.map(t => { const fd = distData.find(d => d.trimestredesc===t && d.ingoc1sml_cat===franja && d.sexo===sexo); return fd ? fd.pct : 0; }),
         name: `${franja} (${sexo})`,
-        type: 'scatter', mode: 'lines+markers',
-        line: { color: COL_SML[franja], dash: isHombre ? 'solid' : 'dot', width: isHombre ? 3 : 2 },
-        marker: { symbol: isHombre ? 'circle' : 'diamond', size: 8 }
+        type: 'bar',
+        marker: { color: COL_SML[franja], opacity: sexo === 'Hombres' ? 1.0 : 0.6 }
       });
     });
   });
+  Plotly.newPlot('plot-dist', tracesDist, { barmode: 'stack', margin: {t:20, b:60, l:40, r:10}, legend: {orientation: 'h', y: -0.3} }, {responsive: true});
+
+  // 2. Formalidad
+  const formData = groupData(filteredData, ['trimestredesc', 'ingoc1sml_cat', 'sexo'], (items, wSum) => calcWMean(items, 'cotiza_bin', 'w') * 100);
+  const tracesForm = [];
+  franjas.forEach(franja => {
+    generos.forEach(sexo => {
+      tracesForm.push({
+        x: trimestres,
+        y: trimestres.map(t => { const fd = formData.find(d => d.trimestredesc===t && d.ingoc1sml_cat===franja && d.sexo===sexo); return fd ? fd.value : null; }),
+        name: `${franja} (${sexo})`,
+        type: 'scatter', mode: 'lines+markers',
+        marker: { color: COL_SML[franja], symbol: sexo === 'Hombres' ? 'circle' : 'diamond', size: 8 },
+        line: { width: sexo === 'Hombres' ? 3 : 2, dash: sexo === 'Hombres' ? 'solid' : 'dot' }
+      });
+    });
+  });
+  Plotly.newPlot('plot-formal', tracesForm, { margin: {t:20, b:40, l:40, r:10}, legend: {orientation: 'h', y: -0.3} }, {responsive: true});
+
+  // 3. Salario Promedio
+  const salData = groupData(filteredData, ['trimestredesc', 'sexo'], (items, wSum) => calcWMean(items, 'salario', 'w'));
+  const tracesSal = generos.map(sexo => {
+    return {
+      x: trimestres,
+      y: trimestres.map(t => { const fd = salData.find(d => d.trimestredesc===t && d.sexo===sexo); return fd ? fd.value : null; }),
+      name: `Salario General (${sexo})`,
+      type: 'scatter', mode: 'lines+markers',
+      line: { color: sexo === 'Hombres' ? '#3498DB' : '#E74C3C', width: 4 },
+      marker: { size: 10 }
+    };
+  });
   Plotly.newPlot('plot-sal', tracesSal, { margin: {t:20, b:40, l:60, r:10}, legend: {orientation: 'h', y: -0.2} }, {responsive: true});
 
+  // 4. Llenar Tabla Resumen
+  drawTable(franjas, generos);
+}
+
+function drawTable(franjas, generos) {
+  const tbody = document.getElementById('summary-table-body');
+  let html = '';
+  
+  generos.forEach(sexo => {
+    let rowSpanAdded = false;
+    franjas.forEach(franja => {
+      const items = filteredData.filter(d => d.sexo === sexo && d.ingoc1sml_cat === franja);
+      let sumW = 0; items.forEach(d => sumW += (d.w||0));
+      const sal = calcWMean(items, 'salario', 'w');
+      const form = calcWMean(items, 'cotiza_bin', 'w') * 100;
+      
+      html += `<tr>`;
+      if(!rowSpanAdded) {
+        html += `<td rowspan="${franjas.length}" class="fw-bold align-middle">${sexo}</td>`;
+        rowSpanAdded = true;
+      }
+      html += `
+        <td><span style="display:inline-block; width:12px; height:12px; background-color:${COL_SML[franja]}; margin-right:5px; border-radius:2px;"></span>${franja}</td>
+        <td class="text-end">${formatGs(sumW)}</td>
+        <td class="text-end">${formatGs(sal)}</td>
+        <td class="text-end">${form.toFixed(1)}%</td>
+      </tr>`;
+    });
+  });
+  tbody.innerHTML = html;
 }
 
 // Iniciar aplicación
