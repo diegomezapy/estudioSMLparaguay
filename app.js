@@ -144,6 +144,7 @@ function processData(data) {
     el.addEventListener('change', updateApp);
   });
   
+  document.querySelectorAll('.filter-q').forEach(el => el.addEventListener('change', updateApp));
   document.querySelectorAll('input[name="filter-sexo"]').forEach(el => el.addEventListener('change', updateApp));
   document.querySelectorAll('input[name="filter-area"]').forEach(el => el.addEventListener('change', updateApp));
   
@@ -152,6 +153,7 @@ function processData(data) {
     els.tolVal.textContent = "10";
     els.yrMin.value = 2022;
     els.yrMax.value = 2025;
+    document.querySelectorAll('.filter-q').forEach(el => el.checked = true);
     document.getElementById('sexo-todos').checked = true;
     document.getElementById('area-todos').checked = true;
     document.getElementById('rama-todos').checked = true;
@@ -222,6 +224,8 @@ function updateApp() {
   const rama = document.querySelector('input[name="filter-rama"]:checked').value;
   const ocup = document.querySelector('input[name="filter-ocup"]:checked').value;
   const cate = document.querySelector('input[name="filter-cate"]:checked').value;
+  
+  const selectedQs = Array.from(document.querySelectorAll('.filter-q:checked')).map(el => parseInt(el.value));
 
   const lo = 1 - tol;
   const hi = 1 + tol;
@@ -232,6 +236,7 @@ function updateApp() {
   for(let i=0; i<rawData.length; i++) {
     const d = rawData[i];
     if (d.anio < yrMin || d.anio > yrMax) continue;
+    if (!selectedQs.includes(d.q)) continue;
     if (sexo !== "Todos" && d.sexo !== sexo) continue;
     if (area !== 'Todos' && String(d.area_urb) !== area) continue;
     if (dpto !== 'Todos' && String(d.dptorep) !== dpto) continue;
@@ -379,13 +384,13 @@ function drawPlots() {
   drawTable(trimestres, generos);
   
   // ================= TAB DEMOGRAFIA ==================
-  drawDemografia(filteredData);
+  drawDemografia(filteredData, trimestres);
   
   // ================= TAB MAPAS ==================
   drawMap(filteredData);
 }
 
-function drawDemografia(data) {
+function drawDemografia(data, trimestres) {
   // Función auxiliar para nivel educativo
   const getEducNivel = (anios) => {
     if (anios < 7) return "Educación Básica";
@@ -393,7 +398,6 @@ function drawDemografia(data) {
     return "Educación Superior";
   };
   
-  // Función auxiliar para franja de edad
   const getEdadFranja = (edad) => {
     if (edad < 25) return "15-24 años";
     if (edad < 35) return "25-34 años";
@@ -402,54 +406,58 @@ function drawDemografia(data) {
     return "55+ años";
   };
 
-  const educStats = { "Educación Básica": { w:0, wSal:0 }, "Educación Media": { w:0, wSal:0 }, "Educación Superior": { w:0, wSal:0 } };
-  const edadStats = {}; // { franjaSML: { "15-24": w, ... } }
+  const educStats = {}; // {Trimestre: { "Educación Básica": { w:0, wSal:0 }... }}
+  const edadStats = {}; // {Trimestre: { "15-24 años": w, ... }}
   
   data.forEach(d => {
+    const t = d.trimestredesc;
+    if (!educStats[t]) {
+      educStats[t] = { "Educación Básica": {w:0, wSal:0}, "Educación Media": {w:0, wSal:0}, "Educación Superior": {w:0, wSal:0} };
+      edadStats[t] = { "15-24 años": 0, "25-34 años": 0, "35-44 años": 0, "45-54 años": 0, "55+ años": 0 };
+    }
+    
     // Educacion
     if (d.educacion !== undefined && d.educacion !== null) {
       const niv = getEducNivel(d.educacion);
-      educStats[niv].w += d.w;
-      educStats[niv].wSal += d.salario * d.w;
+      educStats[t][niv].w += d.w;
+      educStats[t][niv].wSal += d.salario * d.w;
     }
     // Edad
     if (d.edad !== undefined && d.edad !== null) {
       const franjaE = getEdadFranja(d.edad);
-      const franjaS = d.ingoc1sml_cat;
-      if (!edadStats[franjaS]) edadStats[franjaS] = {};
-      if (!edadStats[franjaS][franjaE]) edadStats[franjaS][franjaE] = 0;
-      edadStats[franjaS][franjaE] += d.w;
+      edadStats[t][franjaE] += d.w;
     }
   });
 
-  // Plot Distribución Nivel Educativo
   const educLabels = ["Educación Básica", "Educación Media", "Educación Superior"];
-  const educVals = educLabels.map(l => educStats[l].w);
-  Plotly.newPlot('plot-educacion', [{
-    labels: educLabels, values: educVals, type: 'pie', hole: .4,
-    marker: { colors: ['#e67e22', '#f1c40f', '#2c3e50'] }
-  }], { margin: { t: 20, b: 20, l: 20, r: 20 } }, { responsive: true, displayModeBar: false });
+  const colsEduc = ['#e67e22', '#f1c40f', '#2c3e50'];
+  const franjasEdad = ["15-24 años", "25-34 años", "35-44 años", "45-54 años", "55+ años"];
+  const colsEdad = ['#ff9999', '#66b3ff', '#99ff99', '#ffcc99', '#c2c2f0'];
+
+  // Plot Distribución Nivel Educativo (líneas de tendencia % o absoluto)
+  // Vamos a usar absoluto ponderado
+  const tracesEducDist = educLabels.map((l, i) => {
+    const ys = trimestres.map(t => educStats[t] ? educStats[t][l].w : null);
+    return { name: l, x: trimestres, y: ys, type: 'scatter', mode: 'lines+markers', line: { color: colsEduc[i], shape: 'spline', width: 3 }, marker: {size: 6} };
+  });
+  Plotly.newPlot('plot-educacion', tracesEducDist, { margin: { t: 20, b: 40, l: 60, r: 20 } }, { responsive: true, displayModeBar: false });
 
   // Plot Salario por Nivel Educativo
-  const educSal = educLabels.map(l => educStats[l].w > 0 ? (educStats[l].wSal / educStats[l].w) : 0);
-  Plotly.newPlot('plot-sal-educacion', [{
-    x: educLabels, y: educSal, type: 'bar', marker: { color: '#27ae60' }
-  }], {
-    margin: { t: 20, b: 40, l: 60, r: 20 },
-    yaxis: { tickformat: ',.0f' }
+  const tracesEducSal = educLabels.map((l, i) => {
+    const ys = trimestres.map(t => educStats[t] && educStats[t][l].w > 0 ? (educStats[t][l].wSal / educStats[t][l].w) : null);
+    return { name: l, x: trimestres, y: ys, type: 'scatter', mode: 'lines+markers', line: { color: colsEduc[i], shape: 'spline', width: 3 }, marker: {size: 6} };
+  });
+  Plotly.newPlot('plot-sal-educacion', tracesEducSal, {
+    margin: { t: 20, b: 40, l: 60, r: 20 }, yaxis: { tickformat: ',.0f' }
   }, { responsive: true, displayModeBar: false });
 
-  // Plot Edad por Franja SML
-  const franjasSML = ['Menos de 1 SML', '1 SML', 'Más de 1 SML'];
-  const franjasEdad = ["15-24 años", "25-34 años", "35-44 años", "45-54 años", "55+ años"];
-  const tracesEdad = franjasEdad.map(fe => ({
-    name: fe,
-    x: franjasSML,
-    y: franjasSML.map(fs => edadStats[fs] && edadStats[fs][fe] ? edadStats[fs][fe] : 0),
-    type: 'bar'
-  }));
+  // Plot Franjas de Edad
+  const tracesEdad = franjasEdad.map((fe, i) => {
+    const ys = trimestres.map(t => edadStats[t] ? edadStats[t][fe] : null);
+    return { name: fe, x: trimestres, y: ys, type: 'scatter', mode: 'lines+markers', line: { color: colsEdad[i], shape: 'spline', width: 3 }, marker: {size: 6} };
+  });
   Plotly.newPlot('plot-edad', tracesEdad, {
-    barmode: 'stack', margin: { t: 20, b: 40, l: 60, r: 20 }
+    margin: { t: 20, b: 40, l: 60, r: 20 }
   }, { responsive: true, displayModeBar: false });
 }
 
