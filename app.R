@@ -65,35 +65,30 @@ ui <- page_sidebar(
   theme = theme_sml,
   sidebar = sidebar(
     width = 360,
+    style = "position: fixed; height: 100vh; overflow-y: auto;",
     card(
-      card_header("Datos"),
-      radioButtons(
-        "data_mode", NULL,
-        choices = c(
-          "Preparado (data/db_full.rds)" = "rds",
-          "Subir REG02 (CSV)" = "upload",
-          "Demo (simulado)" = "demo"
-        ),
-        selected = "rds"
-      ),
-      fileInput("reg02_files", "Archivos REG02 (CSV2)", multiple = TRUE, accept = c(".csv")),
-      actionButton("load_upload", "Cargar archivos", class = "btn-primary"),
-      hr(),
+      card_header("Información"),
       uiOutput("data_status")
     ),
     card(
-      card_header("Filtros"),
+      card_header("Filtros Principales"),
       sliderInput("tol", "Franja 1 SML: tolerancia (±%)", min = 5, max = 20, value = 10, step = 1),
       uiOutput("year_ui"),
       selectInput("sexo", "Género", choices = c("Todos", "Hombres", "Mujeres"), selected = "Todos"),
       selectInput("area", "Área", choices = c("Todos", "Urbano", "Rural"), selected = "Todos")
     ),
     card(
+      card_header("Filtros Específicos"),
+      selectizeInput("dptorep", "Departamento", choices = c("Todos"), selected = "Todos", multiple = TRUE),
+      selectizeInput("rama_pea", "Actividad (Rama)", choices = c("Todos"), selected = "Todos", multiple = TRUE),
+      selectizeInput("ocup_pea", "Ocupación", choices = c("Todos"), selected = "Todos", multiple = TRUE),
+      selectizeInput("cate_pea", "Situación ocupacional", choices = c("Todos"), selected = "Todos", multiple = TRUE)
+    ),
+    card(
       card_header("Notas"),
       tags$ul(
         tags$li("Franjas por defecto: <0,90 | 0,90–1,10 | >1,10 (configurable)."),
-        tags$li("SML 2026 es una proyección preliminar; el ajuste oficial suele confirmarse en junio para regir desde julio."),
-        tags$li("El repo ignora microdatos por defecto (ver .gitignore).")
+        tags$li("SML 2026 es una proyección preliminar.")
       )
     )
   ),
@@ -221,62 +216,32 @@ server <- function(input, output, session) {
   db_loaded <- reactiveVal(NULL)
   db_source <- reactiveVal("—")
 
-  load_from_rds <- function() {
-    path <- file.path(APP_DIR, "data", "db_full.rds")
-    if (!file.exists(path)) return(FALSE)
-    db_loaded(readRDS(path))
-    db_source("data/db_full.rds")
-    TRUE
-  }
-
-  # Inicialización: preferir RDS; si no existe, usar demo
+  # Inicialización: cargar RDS y aplicar filtros estrictos
   observeEvent(TRUE, {
-    ok <- load_from_rds()
-    if (!ok) {
+    path <- file.path(APP_DIR, "data", "db_full.rds")
+    if (file.exists(path)) {
+      d <- readRDS(path)
+      # Filtros duros: remover NAs, inactivos y menores
+      d <- dplyr::filter(d, 
+        edad >= 15,
+        cate_pea != 5, 
+        !is.na(salario), 
+        !is.na(cotiza_bin), 
+        !is.na(ingoc1sml_cat)
+      )
+      db_loaded(d)
+      db_source("Base procesada (db_full.rds)")
+      
+      # Actualizar opciones de filtros específicos
+      updateSelectizeInput(session, "dptorep", choices = c("Todos", sort(unique(na.omit(d$dptorep)))), selected = "Todos")
+      updateSelectizeInput(session, "rama_pea", choices = c("Todos", sort(unique(na.omit(d$rama_pea)))), selected = "Todos")
+      updateSelectizeInput(session, "ocup_pea", choices = c("Todos", sort(unique(na.omit(d$ocup_pea)))), selected = "Todos")
+      updateSelectizeInput(session, "cate_pea", choices = c("Todos", sort(unique(na.omit(d$cate_pea)))), selected = "Todos")
+    } else {
       db_loaded(make_demo_db())
-      db_source("demo (simulado)")
-      updateRadioButtons(session, "data_mode", selected = "demo")
-      showNotification("No se encontró data/db_full.rds. Cargando dataset demo.", type = "warning", duration = 6)
+      db_source("Demo (simulado)")
     }
   }, once = TRUE)
-
-  observeEvent(input$data_mode, {
-    if (input$data_mode == "rds") {
-      ok <- load_from_rds()
-      if (!ok) showNotification("Falta data/db_full.rds. Ejecutar data-prep.R o usar Upload/Demo.", type = "error")
-    }
-    if (input$data_mode == "demo") {
-      db_loaded(make_demo_db())
-      db_source("demo (simulado)")
-    }
-  })
-
-  observeEvent(input$load_upload, {
-    req(input$reg02_files)
-    validate(need(nrow(input$reg02_files) > 0, "Subir al menos 1 archivo REG02."))
-
-    withProgress(message = "Leyendo REG02…", value = 0.1, {
-      tmp_dir <- file.path(tempdir(), "reg02_upload")
-      dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
-      dest <- file.path(tmp_dir, input$reg02_files$name)
-      file.copy(input$reg02_files$datapath, dest, overwrite = TRUE)
-
-      incProgress(0.3)
-      db <- read_reg02_files(dest)
-      incProgress(0.6)
-
-      sml_data <- get_sml_data(include_projection = TRUE)
-      end_date <- as.Date(paste0(max(db$anio, na.rm = TRUE), "-12-01"))
-      sml_monthly <- build_sml_monthly(sml_data, end_date = end_date)
-      db <- add_sml_to_db(db, sml_monthly)
-      db <- derive_reg02_vars(db, tol = input$tol / 100)
-
-      db_loaded(db)
-      db_source("upload REG02 (CSV)")
-      updateRadioButtons(session, "data_mode", selected = "upload")
-      incProgress(1)
-    })
-  })
 
   output$data_status <- renderUI({
     db <- db_loaded()
@@ -313,6 +278,20 @@ server <- function(input, output, session) {
     }
     if (!is.null(input$area) && input$area != "Todos") {
       d <- dplyr::filter(d, area_urb == as.integer(input$area == "Urbano"))
+    }
+    
+    # Filtros específicos
+    if (!is.null(input$dptorep) && !("Todos" %in% input$dptorep)) {
+      d <- dplyr::filter(d, dptorep %in% input$dptorep)
+    }
+    if (!is.null(input$rama_pea) && !("Todos" %in% input$rama_pea)) {
+      d <- dplyr::filter(d, rama_pea %in% input$rama_pea)
+    }
+    if (!is.null(input$ocup_pea) && !("Todos" %in% input$ocup_pea)) {
+      d <- dplyr::filter(d, ocup_pea %in% input$ocup_pea)
+    }
+    if (!is.null(input$cate_pea) && !("Todos" %in% input$cate_pea)) {
+      d <- dplyr::filter(d, cate_pea %in% input$cate_pea)
     }
 
     trim_levels <- order_trimestres(d)
@@ -365,7 +344,10 @@ server <- function(input, output, session) {
   output$p_dist <- renderPlotly({
     d <- db()
     dist <- tab_dist_sml(d) %>%
-      mutate(trimestredesc = factor(trimestredesc, levels = levels(d$trimestredesc)))
+      mutate(
+        trimestredesc = factor(trimestredesc, levels = levels(d$trimestredesc)),
+        ingoc1sml_cat = factor(ingoc1sml_cat, levels = rev(levels(ingoc1sml_cat)))
+      )
 
     g <- ggplot(dist, aes(trimestredesc, pct, fill = ingoc1sml_cat)) +
       geom_col() +
