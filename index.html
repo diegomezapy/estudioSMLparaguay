@@ -44,19 +44,25 @@
              <input type="number" class="form-control form-control-sm" id="filter-year-max" value="2025">
           </div>
           
-          <label class="form-label mt-2">Género</label>
-          <select class="form-select form-select-sm" id="filter-sexo">
-            <option value="Todos">Todos</option>
-            <option value="Hombres">Hombres</option>
-            <option value="Mujeres">Mujeres</option>
-          </select>
+          <label class="form-label mt-2 d-block">Género</label>
+          <div class="btn-group w-100" role="group" id="filter-sexo-group">
+            <input type="radio" class="btn-check" name="filter-sexo" id="sexo-todos" value="Todos" checked>
+            <label class="btn btn-outline-primary btn-sm" for="sexo-todos">Todos</label>
+            <input type="radio" class="btn-check" name="filter-sexo" id="sexo-hom" value="Hombres">
+            <label class="btn btn-outline-primary btn-sm" for="sexo-hom">Hombres</label>
+            <input type="radio" class="btn-check" name="filter-sexo" id="sexo-muj" value="Mujeres">
+            <label class="btn btn-outline-primary btn-sm" for="sexo-muj">Mujeres</label>
+          </div>
           
-          <label class="form-label mt-2">Área</label>
-          <select class="form-select form-select-sm" id="filter-area">
-            <option value="Todos">Todos</option>
-            <option value="1">Urbano</option>
-            <option value="0">Rural</option>
-          </select>
+          <label class="form-label mt-3 d-block">Área Geográfica</label>
+          <div class="btn-group w-100" role="group" id="filter-area-group">
+            <input type="radio" class="btn-check" name="filter-area" id="area-todos" value="Todos" checked>
+            <label class="btn btn-outline-success btn-sm" for="area-todos">Ambas</label>
+            <input type="radio" class="btn-check" name="filter-area" id="area-urb" value="1">
+            <label class="btn btn-outline-success btn-sm" for="area-urb">Urbano</label>
+            <input type="radio" class="btn-check" name="filter-area" id="area-rur" value="0">
+            <label class="btn btn-outline-success btn-sm" for="area-rur">Rural</label>
+          </div>
         </div>
       </div>
       
