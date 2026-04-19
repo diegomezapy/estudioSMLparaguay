@@ -58,9 +58,9 @@ const els = {
   tolVal: document.getElementById('tol-val'),
   yrMin: document.getElementById('filter-year-min'),
   yrMax: document.getElementById('filter-year-max'),
-  rama: document.getElementById('filter-rama'),
-  ocup: document.getElementById('filter-ocup'),
-  cate: document.getElementById('filter-cate')
+  rama: document.getElementById('filter-rama-group'),
+  ocup: document.getElementById('filter-ocup-group'),
+  cate: document.getElementById('filter-cate-group')
 };
 
 // Utilidades
@@ -139,13 +139,26 @@ function processData(data) {
   els.main.style.display = 'block';
   
   // Asignar listeners
-  [els.tolSlider, els.yrMin, els.yrMax, els.rama, els.ocup, els.cate].forEach(el => {
+  [els.tolSlider, els.yrMin, els.yrMax].forEach(el => {
     el.addEventListener('change', updateApp);
   });
   
   document.querySelectorAll('input[name="filter-sexo"]').forEach(el => el.addEventListener('change', updateApp));
   document.querySelectorAll('input[name="filter-area"]').forEach(el => el.addEventListener('change', updateApp));
   
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    els.tolSlider.value = 10;
+    els.tolVal.textContent = "10";
+    els.yrMin.value = 2022;
+    els.yrMax.value = 2025;
+    document.getElementById('sexo-todos').checked = true;
+    document.getElementById('area-todos').checked = true;
+    document.getElementById('rama-todos').checked = true;
+    document.getElementById('ocup-todos').checked = true;
+    document.getElementById('cate-todos').checked = true;
+    updateApp();
+  });
+
   els.tolSlider.addEventListener('input', (e) => {
     els.tolVal.textContent = e.target.value;
   });
@@ -161,17 +174,26 @@ function populateSelects(data) {
     if(d.cate_pea) cates.add(d.cate_pea);
   });
 
-  const addOptions = (el, set, type) => {
+  const addButtons = (el, set, type, name) => {
     Array.from(set).sort((a,b)=>a-b).forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v; opt.textContent = getLabel(type, v);
-      el.appendChild(opt);
+      const input = document.createElement('input');
+      input.type = 'radio'; input.className = 'btn-check';
+      input.name = name; input.id = `${name}-${v}`; input.value = v;
+      input.addEventListener('change', updateApp);
+      
+      const label = document.createElement('label');
+      label.className = 'btn btn-outline-secondary btn-sm flex-fill text-start';
+      label.htmlFor = `${name}-${v}`;
+      label.textContent = getLabel(type, v);
+      
+      el.appendChild(input);
+      el.appendChild(label);
     });
   };
 
-  addOptions(els.rama, ramas, 'rama_pea');
-  addOptions(els.ocup, ocups, 'ocup_pea');
-  addOptions(els.cate, cates, 'cate_pea');
+  addButtons(els.rama, ramas, 'rama_pea', 'filter-rama');
+  addButtons(els.ocup, ocups, 'ocup_pea', 'filter-ocup');
+  addButtons(els.cate, cates, 'cate_pea', 'filter-cate');
 }
 
 function updateApp() {
@@ -180,9 +202,9 @@ function updateApp() {
   const yrMax = parseInt(els.yrMax.value);
   const sexo = document.querySelector('input[name="filter-sexo"]:checked').value;
   const area = document.querySelector('input[name="filter-area"]:checked').value;
-  const rama = els.rama.value;
-  const ocup = els.ocup.value;
-  const cate = els.cate.value;
+  const rama = document.querySelector('input[name="filter-rama"]:checked').value;
+  const ocup = document.querySelector('input[name="filter-ocup"]:checked').value;
+  const cate = document.querySelector('input[name="filter-cate"]:checked').value;
 
   const lo = 1 - tol;
   const hi = 1 + tol;
