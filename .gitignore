@@ -11,7 +11,8 @@ tmp/
 
 # Datos sensibles (microdatos)
 bases/*
-data/*
+data/*.csv
+data/personas/*
 
 # Mantener documentación de carpetas
 !bases/
