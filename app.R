@@ -17,6 +17,10 @@ suppressPackageStartupMessages({
   library(scales)
   library(survey)
   library(fixest)
+  library(readr)
+  library(janitor)
+  library(stringr)
+  library(lubridate)
 })
 
 APP_DIR <- getwd()

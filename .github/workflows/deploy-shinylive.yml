@@ -28,6 +28,7 @@ jobs:
       - name: Build Shinylive app
         run: |
           Rscript -e 'shinylive::export(".", "site")'
+          touch site/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
