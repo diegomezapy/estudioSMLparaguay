@@ -43,16 +43,36 @@ const calcWShare = (data, conditionFn, wKey) => {
 
 // Carga Inicial
 function init() {
+  els.info.textContent = "Descargando datos...";
   Papa.parse('data/db_app.csv', {
     download: true,
     header: true,
     dynamicTyping: true,
     skipEmptyLines: true,
-    step: function(results, parser) {
-      // Opcional: mostrar progreso si tuviéramos un Content-Length total (difícil sin server headers)
+    error: function(err, file, inputElem, reason) {
+      console.error(err);
+      els.info.textContent = "Error de carga.";
+      els.spinner.innerHTML = `
+        <div class="text-center text-danger">
+          <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+          <h4>Error al cargar datos</h4>
+          <p>No se pudo descargar db_app.csv.</p>
+          <p><small>Asegúrate de estar viendo la página en GitHub Pages (https://...) y no desde tu computadora (file://).</small></p>
+        </div>`;
     },
     complete: function(results) {
-      processData(results.data);
+      try {
+        processData(results.data);
+      } catch (e) {
+        console.error("Error procesando datos:", e);
+        els.info.textContent = "Error en procesamiento.";
+        els.spinner.innerHTML = `
+          <div class="text-center text-danger">
+            <i class="fas fa-bug fa-3x mb-3"></i>
+            <h4>Error interno</h4>
+            <p>${e.message}</p>
+          </div>`;
+      }
     }
   });
 }
@@ -126,10 +146,10 @@ function updateApp() {
     const d = rawData[i];
     if (d.anio < yrMin || d.anio > yrMax) continue;
     if (sexo !== "Todos" && d.sexo !== sexo) continue;
-    if (area !== "Todos" && d.area_urb != area) continue;
-    if (rama !== "Todos" && d.rama_pea != rama) continue;
-    if (ocup !== "Todos" && d.ocup_pea != ocup) continue;
-    if (cate !== "Todos" && d.cate_pea != cate) continue;
+    if (area !== "Todos" && String(d.area_urb) !== String(area)) continue;
+    if (rama !== "Todos" && String(d.rama_pea) !== String(rama)) continue;
+    if (ocup !== "Todos" && String(d.ocup_pea) !== String(ocup)) continue;
+    if (cate !== "Todos" && String(d.cate_pea) !== String(cate)) continue;
 
     // Calcular franja dinámicamente
     if (d.ratio_sml < lo) d.ingoc1sml_cat = "Menos de 1 SML";
@@ -140,7 +160,7 @@ function updateApp() {
     sumWTotal += (d.w || 0);
   }
 
-  els.info.textContent = `Registros: ${filteredData.length.toLocaleString('es-PY')} (N Poblacional: ${formatGs(sumWTotal)})`;
+  els.info.textContent = `Registros: ${filteredData.length.toLocaleString('es-PY')} (N: ${formatGs(sumWTotal)})`;
 
   updateKPIs(sumWTotal);
   drawPlots();
@@ -182,15 +202,15 @@ function groupData(data, groupKeys, aggFn) {
 }
 
 function drawPlots() {
-  if(filteredData.length === 0) return;
+  if(filteredData.length === 0) {
+    Plotly.purge('plot-dist');
+    Plotly.purge('plot-formal');
+    Plotly.purge('plot-sal');
+    return;
+  }
 
-  // Ordenamos los trimestres (anio + q)
-  const trimestres = Array.from(new Set(filteredData.map(d => d.trimestredesc))).sort((a, b) => {
-    // a = "T1 2022" -> sort string by year then T
-    const pa = a.split(' '); const pb = b.split(' ');
-    if (pa[1] !== pb[1]) return pa[1] - pb[1];
-    return pa[0].localeCompare(pb[0]);
-  });
+  // Ordenamos los trimestres (anio + q) de forma alfabética (2022Trim1, 2022Trim2, etc.)
+  const trimestres = Array.from(new Set(filteredData.map(d => d.trimestredesc))).sort();
 
   const franjas = ["Menos de 1 SML", "1 SML", "Más de 1 SML"];
 
