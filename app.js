@@ -511,8 +511,6 @@ function drawDemografia(data, trimestres) {
 
 function drawMap(data) {
   Plotly.purge('plot-mapa');
-  document.getElementById('plot-mapa').innerHTML = '<div class="d-flex align-items-center justify-content-center h-100 text-muted"><p>En desarrollo...</p></div>';
-  return;
   const dptoStats = {};
   data.forEach(d => {
     if (d.dptorep === undefined || d.dptorep === null) return;
@@ -527,49 +525,54 @@ function drawMap(data) {
   const text = [];
   
   // Enlazar con GeoJSON (NAME_1)
-  window.geojsonData.features.forEach(f => {
-    const name = f.properties.NAME_1;
-    // Buscar id de diccionario
-    let dptoId = null;
-    for (const [id, label] of Object.entries(DICT.dptorep)) {
-      if (name.includes(label) || label.includes(name)) {
-        dptoId = id; break;
+  if (window.geojsonData && window.geojsonData.features) {
+    window.geojsonData.features.forEach(f => {
+      const name = f.properties.NAME_1;
+      // Buscar id de diccionario
+      let dptoId = null;
+      for (const [id, label] of Object.entries(DICT.dptorep)) {
+        if (name.includes(label) || label.includes(name)) {
+          dptoId = id; break;
+        }
       }
-    }
-    
-    locations.push(name);
-    if (dptoId && dptoStats[dptoId] && dptoStats[dptoId].w > 0) {
-      const avg = dptoStats[dptoId].wSal / dptoStats[dptoId].w;
-      z.push(avg);
-      text.push(`${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', {maximumFractionDigits:0})} Gs.<br>Trabajadores ponderados: ${dptoStats[dptoId].w.toLocaleString('es-ES', {maximumFractionDigits:0})}`);
-    } else {
-      z.push(null);
-      text.push(`${name}<br>Sin datos`);
-    }
-  });
+      
+      locations.push(name);
+      if (dptoId && dptoStats[dptoId] && dptoStats[dptoId].w > 0) {
+        const avg = dptoStats[dptoId].wSal / dptoStats[dptoId].w;
+        z.push(avg);
+        text.push(`${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', {maximumFractionDigits:0})} Gs.<br>Trabajadores ponderados: ${dptoStats[dptoId].w.toLocaleString('es-ES', {maximumFractionDigits:0})}`);
+      } else {
+        z.push(null);
+        text.push(`${name}<br>Sin datos`);
+      }
+    });
 
-  const trace = {
-    type: "choroplethmapbox",
-    geojson: window.geojsonData,
-    locations: locations,
-    featureidkey: "properties.NAME_1",
-    z: z,
-    text: text,
-    hoverinfo: "text",
-    colorscale: "Viridis",
-    marker: { opacity: 0.7, line: { width: 1, color: "white" } }
-  };
+    const trace = {
+      type: "choroplethmapbox",
+      geojson: window.geojsonData,
+      locations: locations,
+      featureidkey: "properties.NAME_1",
+      z: z,
+      text: text,
+      hoverinfo: "text",
+      colorscale: "Viridis",
+      marker: { opacity: 0.7, line: { width: 1, color: "white" } }
+    };
 
-  const layout = {
-    mapbox: {
-      style: "carto-positron",
-      center: { lon: -58.0, lat: -23.5 },
-      zoom: 4.5
-    },
-    margin: { t: 0, b: 0, l: 0, r: 0 }
-  };
+    const layout = {
+      mapbox: {
+        style: "carto-positron",
+        center: { lon: -58.0, lat: -23.5 },
+        zoom: 4.5
+      },
+      margin: { t: 0, b: 0, l: 0, r: 0 }
+    };
 
-  Plotly.newPlot('plot-mapa', [trace], layout, { responsive: true, displayModeBar: false });
+    Plotly.newPlot('plot-mapa', [trace], layout, { responsive: true, displayModeBar: false });
+  } else {
+    // Retry in 500ms
+    setTimeout(updateApp, 500);
+  }
 }
 
 function drawTable(trimestres, generos) {
