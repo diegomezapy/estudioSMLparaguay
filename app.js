@@ -291,6 +291,7 @@ function updateApp() {
 
   updateKPIs(sumWTotal);
   drawPlots();
+  drawHousingPlots();
 }
 
 function updateKPIs(sumWTotal) {
@@ -605,5 +606,74 @@ function drawTable(trimestres, generos) {
   tbody.innerHTML = html;
 }
 
+function drawHousingPlots() {
+  const trimestres = Array.from(new Set(filteredData.map(d => `${d.anio}-Q${d.q}`))).sort();
+  const franjas = ["Menos de 1 SML", "1 SML", "Más de 1 SML"];
+  const cols = ["#808080", "#2ca02c", "#1f77b4"]; // Gris, Verde, Azul
+  const tol = parseFloat(els.tolVal.textContent) / 100;
+
+  // Initialize accumulators
+  const stats = {};
+  trimestres.forEach(t => {
+    stats[t] = {};
+    franjas.forEach(f => {
+      stats[t][f] = { internet: 0, agua: 0, piso: 0, w: 0 };
+    });
+  });
+
+  filteredData.forEach(d => {
+    const t = `${d.anio}-Q${d.q}`;
+    let cat = "";
+    const r = d.ratio_sml;
+    if (r >= (1 - tol)) {
+      if (r <= (1 + tol)) cat = "1 SML";
+      else cat = "Más de 1 SML";
+    } else {
+      cat = "Menos de 1 SML";
+    }
+    
+    if (d.w > 0) {
+      stats[t][cat].w += d.w;
+      if (d.internet === 1) stats[t][cat].internet += d.w;
+      if (d.agua_potable === 1) stats[t][cat].agua += d.w;
+      if (d.piso_bueno === 1) stats[t][cat].piso += d.w;
+    }
+  });
+
+  const getTraces = (indicatorKey) => {
+    return franjas.map((fe, i) => {
+      const ys = trimestres.map(t => {
+        const s = stats[t][fe];
+        return s.w > 0 ? (s[indicatorKey] / s.w) * 100 : null;
+      });
+      return { 
+        name: fe, 
+        x: trimestres, 
+        y: ys, 
+        type: 'scatter', 
+        mode: 'lines+markers', 
+        line: { color: cols[i], shape: 'spline', width: 3 }, 
+        marker: {size: 6} 
+      };
+    });
+  };
+
+  const layoutTpl = (title) => ({
+    title: { text: title, font: { size: 14 } },
+    yaxis: { title: "% de Trabajadores", rangemode: 'tozero', tickformat: '.0f' },
+    margin: { t: 40, b: 40, l: 60, r: 20 },
+    legend: { orientation: 'h', y: -0.2 }
+  });
+
+  if(document.getElementById('plot-internet')) {
+    Plotly.newPlot('plot-internet', getTraces('internet'), layoutTpl('Acceso a Internet en el Hogar (%)'), { responsive: true, displayModeBar: false });
+  }
+  if(document.getElementById('plot-agua')) {
+    Plotly.newPlot('plot-agua', getTraces('agua'), layoutTpl('Vivienda con Agua Segura (%)'), { responsive: true, displayModeBar: false });
+  }
+  if(document.getElementById('plot-piso')) {
+    Plotly.newPlot('plot-piso', getTraces('piso'), layoutTpl('Vivienda con Pisos de Materiales Aptos (%)'), { responsive: true, displayModeBar: false });
+  }
+}
 // Iniciar aplicación
 document.addEventListener('DOMContentLoaded', init);

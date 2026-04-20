@@ -175,6 +175,9 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-bold text-dark" id="mapas-tab" data-bs-toggle="tab" data-bs-target="#mapas" type="button" role="tab"><i class="fas fa-map-marked-alt"></i> Mapas Departamentales</button>
         </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark" id="vivienda-tab" data-bs-toggle="tab" data-bs-target="#vivienda" type="button" role="tab"><i class="fas fa-home"></i> Viviendas y Bienestar</button>
+        </li>
       </ul>
 
       <!-- Tab panes -->
@@ -383,6 +386,28 @@
             </div>
           </div>
         </div> <!-- /mapas tab -->
+
+        <!-- TAB VIVIENDAS -->
+        <div class="tab-pane" id="vivienda" role="tabpanel">
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light fw-bold text-dark">
+              <h5 class="card-title mb-0">Condiciones de Vida por Nivel de Ingresos</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-12 mb-4">
+                  <div id="plot-internet" style="height: 350px;"></div>
+                </div>
+                <div class="col-md-12 mb-4">
+                  <div id="plot-agua" style="height: 350px;"></div>
+                </div>
+                <div class="col-md-12 mb-4">
+                  <div id="plot-piso" style="height: 350px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- /viviendas tab -->
 
       </div>
 
