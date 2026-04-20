@@ -138,7 +138,8 @@ function processData(data) {
 
   populateSelects(rawData);
   
-  els.bar.parentElement.style.display = 'none';
+  const infoCard = document.getElementById('info-card');
+  if (infoCard) infoCard.style.display = 'none';
   els.spinner.remove(); // Elimina el cartel central por completo
   els.main.style.display = 'block';
   
@@ -548,7 +549,7 @@ function drawMap(data) {
     });
 
     const trace = {
-      type: "choroplethmapbox",
+      type: "choropleth",
       geojson: window.geojsonData,
       locations: locations,
       featureidkey: "properties.NAME_1",
@@ -556,14 +557,14 @@ function drawMap(data) {
       text: text,
       hoverinfo: "text",
       colorscale: "Viridis",
-      marker: { opacity: 0.7, line: { width: 1, color: "white" } }
+      marker: { opacity: 0.9, line: { width: 0.5, color: "white" } }
     };
 
     const layout = {
-      mapbox: {
-        style: "carto-positron",
-        center: { lon: -58.0, lat: -23.5 },
-        zoom: 4.5
+      geo: {
+        fitbounds: "locations",
+        visible: false,
+        projection: { type: "mercator" }
       },
       margin: { t: 0, b: 0, l: 0, r: 0 }
     };
