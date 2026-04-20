@@ -58,6 +58,16 @@ read_reg01_files <- function(dir_viviendas) {
     }
     
     df$anio <- year
+    
+    # IMPORTANTE: Los archivos REG01 de 2022 y 2023 fueron proveídos con la nomenclatura de
+    # trimestres invertida (T1 corresponde a Q4, T2 a Q3, etc.) respecto a la base REG02.
+    if (year %in% c(2022, 2023)) {
+      if (q == 1) q <- 4
+      else if (q == 2) q <- 3
+      else if (q == 3) q <- 2
+      else if (q == 4) q <- 1
+    }
+    
     df$q <- q
     
     df
