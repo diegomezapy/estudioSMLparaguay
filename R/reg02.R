@@ -29,14 +29,12 @@ read_reg02_files <- function(files, anios = NULL) {
     trimestredesc = paste0(anio, "Trim", q)
   )
 
-  # Peso (cambia según año/fuente)
-  if ("fex_2022" %in% names(db)) {
-    db$w <- safe_numeric(db$fex_2022)
-  } else if ("factor" %in% names(db)) {
-    db$w <- safe_numeric(db$factor)
-  } else {
-    db$w <- 1
-  }
+  # Peso (combina fex_2022 y factor según disponibilidad por trimestre)
+  w_vec <- rep(NA_real_, nrow(db))
+  if ("fex_2022" %in% names(db)) w_vec <- dplyr::coalesce(w_vec, safe_numeric(db$fex_2022))
+  if ("factor" %in% names(db)) w_vec <- dplyr::coalesce(w_vec, safe_numeric(db$factor))
+  
+  db$w <- w_vec
 
   if (all(is.na(db$w)) || mean(is.na(db$w)) > 0.1) {
     db$w <- 1
