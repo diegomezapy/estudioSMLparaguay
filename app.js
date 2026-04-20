@@ -249,8 +249,6 @@ function updateApp() {
     // Actualizar ratio_sml en base al SML
     d.ratio_sml_plot = d.salario_plot / d.sml_plot;
 
-    if (d.ratio_sml_plot < lo || d.ratio_sml_plot > hi) continue;
-
     // Calcular franja dinámicamente
     if (d.ratio_sml_plot < lo) d.ingoc1sml_cat = "Menos de 1 SML";
     else if (d.ratio_sml_plot > hi) d.ingoc1sml_cat = "Más de 1 SML";
