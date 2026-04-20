@@ -61,7 +61,10 @@ const els = {
   dpto: document.getElementById('filter-dpto'),
   rama: document.getElementById('filter-rama-group'),
   ocup: document.getElementById('filter-ocup-group'),
-  cate: document.getElementById('filter-cate-group')
+  cate: document.getElementById('filter-cate-group'),
+  internet: document.getElementById('filter-internet'),
+  agua: document.getElementById('filter-agua'),
+  piso: document.getElementById('filter-piso')
 };
 
 // Utilidades
@@ -153,6 +156,12 @@ function processData(data) {
   
   document.getElementById('toggle-real').addEventListener('change', updateApp);
   document.querySelectorAll('input[name="filter-area"]').forEach(el => el.addEventListener('change', updateApp));
+  if(els.rama) els.rama.addEventListener('click', updateApp);
+  if(els.ocup) els.ocup.addEventListener('click', updateApp);
+  if(els.cate) els.cate.addEventListener('click', updateApp);
+  if(els.internet) els.internet.addEventListener('change', updateApp);
+  if(els.agua) els.agua.addEventListener('change', updateApp);
+  if(els.piso) els.piso.addEventListener('change', updateApp);
   
   document.getElementById('btn-reset').addEventListener('click', () => {
     els.tolSlider.value = 10;
@@ -187,6 +196,15 @@ function populateSelects(data) {
     if(d.rama_pea) ramas.add(d.rama_pea);
     if(d.ocup_pea) ocups.add(d.ocup_pea);
     if(d.cate_pea) cates.add(d.cate_pea);
+    if(d.dptorep !== undefined && d.dptorep !== null && d.dptorep !== "") dptos.add(d.dptorep);
+  });
+
+  els.dpto.innerHTML = '<option value="Todos">Todos los Departamentos</option>';
+  const sortedDptos = Array.from(dptos).sort((a,b)=>a-b);
+  sortedDptos.forEach(v => {
+    let name = v;
+    if (DICT.dptorep && DICT.dptorep[v]) name = DICT.dptorep[v];
+    els.dpto.innerHTML += `<option value="${v}">${name}</option>`;
   });
 
   const addButtons = (el, set, type, name) => {
@@ -218,6 +236,11 @@ function updateApp() {
   const sexo = document.querySelector('input[name="filter-sexo"]:checked').value;
   const area = document.querySelector('input[name="filter-area"]:checked').value;
   const dpto = els.dpto.value;
+  
+  const fInternet = els.internet ? els.internet.value : "Todos";
+  const fAgua = els.agua ? els.agua.value : "Todos";
+  const fPiso = els.piso ? els.piso.value : "Todos";
+  
   const rama = document.querySelector('input[name="filter-rama"]:checked').value;
   const ocup = document.querySelector('input[name="filter-ocup"]:checked').value;
   const cate = document.querySelector('input[name="filter-cate"]:checked').value;
@@ -239,8 +262,13 @@ function updateApp() {
     if (area !== 'Todos' && String(d.area_urb) !== area) continue;
     if (dpto !== 'Todos' && String(d.dptorep) !== dpto) continue;
     if (rama !== 'Todos' && String(d.rama_pea) !== rama) continue;
-    if (ocup !== 'Todos' && String(d.ocup_pea) !== String(ocup)) continue;
-    if (cate !== 'Todos' && String(d.cate_pea) !== String(cate)) continue;
+    if (ocup !== "Todos" && String(d.ocup_pea) !== String(ocup)) continue;
+    if (cate !== "Todos" && String(d.cate_pea) !== String(cate)) continue;
+
+    // Filtros de Vivienda
+    if (fInternet !== "Todos" && String(d.internet) !== fInternet) continue;
+    if (fAgua !== "Todos" && String(d.agua_potable) !== fAgua) continue;
+    if (fPiso !== "Todos" && String(d.piso_bueno) !== fPiso) continue;
 
     // Calcular variables en tiempo de ejecución (Real vs Nominal)
     d.salario_plot = isReal ? d.salario / (d.ipc / 100) : d.salario;
@@ -516,7 +544,7 @@ function drawMap(data) {
       text.push(`${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', {maximumFractionDigits:0})} Gs.<br>Trabajadores ponderados: ${dptoStats[dptoId].w.toLocaleString('es-ES', {maximumFractionDigits:0})}`);
     } else {
       z.push(null);
-      text.push(`${name}<br>Sin datos suficientes`);
+      text.push(`${name}<br>Sin datos`);
     }
   });
 

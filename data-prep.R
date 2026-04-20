@@ -33,6 +33,7 @@ setwd(BASE_DIR)
 source("R/utils.R")
 source("R/sml.R")
 source("R/reg02.R")
+source("R/reg01.R")
 
 ANIOS_ANALISIS <- 2022:2025
 TOL_DEFAULT <- 0.10
@@ -58,6 +59,34 @@ sml_data <- get_sml_data(include_projection = TRUE)
 sml_monthly <- build_sml_monthly(sml_data, end_date = as.Date(paste0(max(ANIOS_ANALISIS), "-12-01")))
 db <- add_sml_to_db(db, sml_monthly)
 
+DIR_VIVIENDAS <- file.path(BASE_DIR, "data", "viviendas")
+DIR_PESOS <- file.path(BASE_DIR, "data", "pesos_nuevos")
+
+if (dir.exists(DIR_VIVIENDAS)) {
+  reg01_db <- read_reg01_files(DIR_VIVIENDAS)
+  if (!is.null(reg01_db)) {
+    db <- db %>% dplyr::left_join(reg01_db, by = c("upm", "nvivi", "anio", "q"))
+  }
+}
+
+if (dir.exists(DIR_PESOS)) {
+  pesos_db <- read_pesos_nuevos(DIR_PESOS)
+  if (!is.null(pesos_db)) {
+    db <- db %>% dplyr::left_join(pesos_db, by = c("upm", "nvivi", "anio", "q"))
+    db <- db %>% dplyr::mutate(w = dplyr::coalesce(w_nuevo, w))
+  }
+}
+
+# Fallback si no hay dpto_residencia
+if (!"dpto_residencia" %in% names(db)) {
+  db$dpto_residencia <- db$d01
+  db$internet <- NA_integer_
+  db$agua_potable <- NA_integer_
+  db$piso_bueno <- NA_integer_
+} else {
+  db$dpto_residencia <- dplyr::coalesce(db$dpto_residencia, db$d01)
+}
+
 db <- derive_reg02_vars(db, tol = TOL_DEFAULT)
 
 # Dataset completo (para app/modelos)
@@ -73,7 +102,8 @@ db_app <- db %>%
     salario = salario,
     sal_hora = sal_hora,
     cotiza_bin, area_urb,
-    tam, rama_pea, ocup_pea, cate_pea, dptorep = d01,
+    tam, rama_pea, ocup_pea, cate_pea, dptorep = dpto_residencia,
+    internet, agua_potable, piso_bueno,
     w, sml, sml_real, ipc, ratio_sml
   )
 readr::write_csv(db_app, OUT_APP)

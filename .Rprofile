@@ -5,8 +5,15 @@ cat("🚀 Ejecutar app: shiny::runApp('app.R')\n")
 cat("📦 Preparar datos: source('data-prep.R')\n")
 cat("\n")
 
+local({
+  r <- getOption("repos")
+  if (identical(r["CRAN"], "@CRAN@") || is.null(r["CRAN"]) || is.na(r["CRAN"]) || r["CRAN"] == "") {
+    r["CRAN"] <- "https://cloud.r-project.org"
+    options(repos = r)
+  }
+})
+
 options(
-  repos = c(CRAN = "https://cloud.r-project.org"),
   digits = 4,
   width = 120,
   scipen = 10,

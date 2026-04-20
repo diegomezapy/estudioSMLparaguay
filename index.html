@@ -84,11 +84,31 @@
             <label class="form-check-label text-white" for="toggle-real">Deflactar a Salario Real (Base Dic 2021)</label>
           </div>
 
-          <label class="form-label d-block text-warning fw-bold"><i class="fas fa-map-marker-alt"></i> Departamento</label>
-          <select class="form-select form-select-sm border-warning" id="filter-dpto" disabled>
-            <option value="Todos">En desarrollo (Requiere base REG01)</option>
-          </select>
-          <div class="form-text text-muted" style="font-size:0.7rem;">⚠️ Módulo geográfico pendiente de datos.</div>
+          <div class="mb-4">
+            <label class="form-label text-warning small fw-bold"><i class="fas fa-map-marker-alt me-1"></i> Departamento (Residencia)</label>
+            <select class="form-select form-select-sm" id="filter-dpto">
+              <!-- Se llena dinámicamente -->
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label text-warning small fw-bold"><i class="fas fa-home me-1"></i> Filtros de Vivienda (Opcional)</label>
+            <select class="form-select form-select-sm mb-2 bg-dark text-white border-secondary" id="filter-internet">
+              <option value="Todos">Internet: Todos</option>
+              <option value="1">Con Internet</option>
+              <option value="0">Sin Internet</option>
+            </select>
+            <select class="form-select form-select-sm mb-2 bg-dark text-white border-secondary" id="filter-agua">
+              <option value="Todos">Agua: Todos</option>
+              <option value="1">Agua Segura/Red</option>
+              <option value="0">Agua no segura</option>
+            </select>
+            <select class="form-select form-select-sm bg-dark text-white border-secondary" id="filter-piso">
+              <option value="Todos">Piso: Todos</option>
+              <option value="1">Piso de Material</option>
+              <option value="0">Piso de Tierra/Otro</option>
+            </select>
+          </div>
         </div>
       </div>
       
@@ -354,12 +374,9 @@
 
         <!-- TAB MAPAS -->
         <div class="tab-pane" id="mapas" role="tabpanel">
-          <div class="alert alert-warning">
-            <i class="fas fa-tools me-1"></i> <strong>Módulo en Desarrollo:</strong> Estamos a la espera de la integración de la base de datos de Viviendas (REG01) para poder mapear la variable de Departamento con precisión total sobre todo el espectro nacional.
-          </div>
           <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white border-bottom-0 pt-3">
-              <h5 class="card-title mb-0">Mapa de Calor: Salario Promedio Departamental</h5>
+            <div class="card-header bg-light fw-bold text-dark">
+              <h5 class="card-title mb-0">Mapa de Calor: Salario Promedio y Población (PEA) por Departamento</h5>
             </div>
             <div class="card-body p-0">
               <div id="plot-mapa" style="height: 600px;"></div>
