@@ -613,70 +613,170 @@ function drawDemografia(data, trimestres) {
   }, { responsive: true, displayModeBar: false });
 }
 
-function drawMap(data) {
-  Plotly.purge('plot-mapa');
-  const dptoStats = {};
-  data.forEach(d => {
-    if (d.dptorep === undefined || d.dptorep === null) return;
-    const dp = String(d.dptorep);
-    if (!dptoStats[dp]) dptoStats[dp] = { w:0, wSal:0 };
-    dptoStats[dp].w += d.w;
-    dptoStats[dp].wSal += d.salario * d.w;
+function normalizeGeoName(txt) {
+  return String(txt || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getGeoBounds(geojson) {
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  const visit = (coords) => {
+    if (!Array.isArray(coords)) return;
+    if (typeof coords[0] === "number" && typeof coords[1] === "number") {
+      const lon = coords[0];
+      const lat = coords[1];
+      if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        if (lon < minLon) minLon = lon;
+        if (lon > maxLon) maxLon = lon;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+      }
+      return;
+    }
+    for (let i = 0; i < coords.length; i++) visit(coords[i]);
+  };
+
+  (geojson.features || []).forEach(f => {
+    if (f && f.geometry && f.geometry.coordinates) visit(f.geometry.coordinates);
   });
 
-  const locations = [];
-  const z = [];
-  const text = [];
-  
-  // Enlazar con GeoJSON (NAME_1)
-  if (window.geojsonData && window.geojsonData.features) {
-    window.geojsonData.features.forEach(f => {
-      const name = f.properties.NAME_1;
-      // Buscar id de diccionario
-      let dptoId = null;
-      for (const [id, label] of Object.entries(DICT.dptorep)) {
-        if (name.includes(label) || label.includes(name)) {
-          dptoId = id; break;
-        }
-      }
-      
-      locations.push(name);
-      if (dptoId && dptoStats[dptoId] && dptoStats[dptoId].w > 0) {
-        const avg = dptoStats[dptoId].wSal / dptoStats[dptoId].w;
-        z.push(avg);
-        text.push(`${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', {maximumFractionDigits:0})} Gs.<br>Trabajadores ponderados: ${dptoStats[dptoId].w.toLocaleString('es-ES', {maximumFractionDigits:0})}`);
-      } else {
-        z.push(null);
-        text.push(`${name}<br>Sin datos`);
-      }
-    });
+  if (!Number.isFinite(minLon) || !Number.isFinite(maxLon) || !Number.isFinite(minLat) || !Number.isFinite(maxLat)) {
+    return null;
+  }
+  return { minLon, maxLon, minLat, maxLat };
+}
 
-    const trace = {
-      type: "choropleth",
-      geojson: window.geojsonData,
-      locations: locations,
-      featureidkey: "properties.NAME_1",
-      z: z,
-      text: text,
-      hoverinfo: "text",
-      colorscale: "Viridis",
-      marker: { opacity: 0.9, line: { width: 0.5, color: "white" } }
-    };
-
-    const layout = {
-      geo: {
-        fitbounds: "locations",
-        visible: false,
-        projection: { type: "mercator" }
-      },
-      margin: { t: 0, b: 0, l: 0, r: 0 }
-    };
-
-    Plotly.newPlot('plot-mapa', [trace], layout, { responsive: true, displayModeBar: false });
-  } else {
+function drawMap(data) {
+  Plotly.purge('plot-mapa');
+  if (!window.geojsonData || !window.geojsonData.features) {
     // Retry in 500ms
     setTimeout(updateApp, 500);
+    return;
   }
+
+  const geojson = window.geojsonData;
+  const dptoStatsByCode = {};
+  data.forEach(d => {
+    if (d.dptorep === undefined || d.dptorep === null) return;
+    const code = String(parseInt(d.dptorep, 10));
+    if (!dptoStatsByCode[code]) dptoStatsByCode[code] = { w: 0, wSal: 0 };
+    dptoStatsByCode[code].w += (d.w || 0);
+    dptoStatsByCode[code].wSal += (d.salario || 0) * (d.w || 0);
+  });
+
+  const geoNames = geojson.features.map(f => f.properties && f.properties.NAME_1).filter(Boolean);
+  const geoNameByNorm = {};
+  geoNames.forEach(name => {
+    geoNameByNorm[normalizeGeoName(name)] = name;
+  });
+
+  const codeToGeoName = {};
+  Object.entries(DICT.dptorep).forEach(([code, label]) => {
+    const normLabel = normalizeGeoName(label);
+    let hit = geoNameByNorm[normLabel] || null;
+    if (!hit) {
+      const candidate = geoNames.find(n => {
+        const nn = normalizeGeoName(n);
+        return nn.includes(normLabel) || normLabel.includes(nn);
+      });
+      if (candidate) hit = candidate;
+    }
+    if (hit) codeToGeoName[code] = hit;
+  });
+
+  const statsByGeoName = {};
+  Object.entries(dptoStatsByCode).forEach(([code, s]) => {
+    const geoName = codeToGeoName[code];
+    if (!geoName) return;
+    if (!statsByGeoName[geoName]) statsByGeoName[geoName] = { w: 0, wSal: 0 };
+    statsByGeoName[geoName].w += s.w;
+    statsByGeoName[geoName].wSal += s.wSal;
+  });
+
+  const allLocations = geoNames.slice();
+  const allText = allLocations.map(name => {
+    const s = statsByGeoName[name];
+    if (!s || s.w <= 0) return `${name}<br>Sin datos (se muestra igualmente)`;
+    const avg = s.wSal / s.w;
+    return `${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', { maximumFractionDigits: 0 })} Gs.<br>Trabajadores ponderados: ${s.w.toLocaleString('es-ES', { maximumFractionDigits: 0 })}`;
+  });
+
+  const dataLocations = [];
+  const dataZ = [];
+  const dataText = [];
+  allLocations.forEach(name => {
+    const s = statsByGeoName[name];
+    if (!s || s.w <= 0) return;
+    const avg = s.wSal / s.w;
+    dataLocations.push(name);
+    dataZ.push(avg);
+    dataText.push(`${name}<br>Salario Promedio: ${avg.toLocaleString('es-ES', { maximumFractionDigits: 0 })} Gs.<br>Trabajadores ponderados: ${s.w.toLocaleString('es-ES', { maximumFractionDigits: 0 })}`);
+  });
+
+  const traces = [];
+  traces.push({
+    type: "choropleth",
+    geojson,
+    locations: allLocations,
+    featureidkey: "properties.NAME_1",
+    z: allLocations.map(() => 1),
+    zmin: 0,
+    zmax: 1,
+    text: allText,
+    hovertemplate: "%{text}<extra></extra>",
+    showscale: false,
+    colorscale: [[0, "#eef3f9"], [1, "#eef3f9"]],
+    marker: { line: { width: 1, color: "#c8d1de" }, opacity: 1 }
+  });
+
+  if (dataLocations.length > 0) {
+    traces.push({
+      type: "choropleth",
+      geojson,
+      locations: dataLocations,
+      featureidkey: "properties.NAME_1",
+      z: dataZ,
+      text: dataText,
+      hovertemplate: "%{text}<extra></extra>",
+      colorscale: "YlGnBu",
+      marker: { line: { width: 1.2, color: "white" }, opacity: 0.95 },
+      colorbar: {
+        title: { text: "Salario promedio (Gs.)", side: "right" },
+        tickformat: ",.0f",
+        thickness: 12,
+        len: 0.72
+      }
+    });
+  }
+
+  const b = getGeoBounds(geojson);
+  const latPad = b ? Math.max((b.maxLat - b.minLat) * 0.08, 0.4) : 0.8;
+  const lonPad = b ? Math.max((b.maxLon - b.minLon) * 0.08, 0.4) : 0.8;
+  const centerLat = b ? (b.minLat + b.maxLat) / 2 : -23.4;
+  const centerLon = b ? (b.minLon + b.maxLon) / 2 : -58.4;
+
+  const layout = {
+    title: { text: "Mapa de Paraguay: salario promedio por departamento", font: { size: 14 } },
+    geo: {
+      projection: { type: "mercator", scale: 1.08 },
+      center: { lat: centerLat, lon: centerLon },
+      lataxis: b ? { range: [b.minLat - latPad, b.maxLat + latPad] } : undefined,
+      lonaxis: b ? { range: [b.minLon - lonPad, b.maxLon + lonPad] } : undefined,
+      showcoastlines: false,
+      showcountries: false,
+      showframe: false,
+      showland: true,
+      landcolor: "#f7f9fc",
+      bgcolor: "#f7f9fc"
+    },
+    margin: { t: 30, b: 10, l: 10, r: 10 },
+    paper_bgcolor: "#f7f9fc"
+  };
+
+  Plotly.newPlot('plot-mapa', traces, layout, { responsive: true, displayModeBar: false });
 }
 
 function drawTable(trimestres, generos) {
