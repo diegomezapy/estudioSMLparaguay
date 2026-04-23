@@ -181,6 +181,9 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-bold text-dark" id="espiral-tab" data-bs-toggle="tab" data-bs-target="#espiral" type="button" role="tab"><i class="fas fa-wave-square"></i> Espiral SML-Precios</button>
         </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark" id="metodologia-tab" data-bs-toggle="tab" data-bs-target="#metodologia" type="button" role="tab"><i class="fas fa-book-open"></i> Metodología</button>
+        </li>
       </ul>
 
       <!-- Tab panes -->
@@ -558,6 +561,179 @@
             </div>
           </div>
         </div> <!-- /espiral tab -->
+
+        <!-- TAB METODOLOGIA -->
+        <div class="tab-pane" id="metodologia" role="tabpanel">
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light fw-bold text-dark">
+              <h5 class="card-title mb-0">Metodología, Datos, Procedimientos y Advertencias</h5>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-primary mb-3">
+                <strong>Colaboración metodológica:</strong> esta sección se desarrolla en colaboración con el trabajo original del estadístico <strong>Diego Daniel Sanabria</strong>.
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                  <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">Cobertura R02 (micro laboral)</small>
+                      <strong id="met-r02-cov">Cargando...</strong>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">Cobertura R01 (hogares)</small>
+                      <strong id="met-r01-cov">Cargando...</strong>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">Cobertura serie macro</small>
+                      <strong id="met-esp-cov">Cargando...</strong>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card border-0 bg-light h-100">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">Eventos detectados</small>
+                      <strong id="met-events">Cargando...</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion" id="metodologiaAccordion">
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="met-h1">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#met-c1" aria-expanded="true" aria-controls="met-c1">
+                      1. Objetivo del estudio y alcance analítico
+                    </button>
+                  </h2>
+                  <div id="met-c1" class="accordion-collapse collapse show" aria-labelledby="met-h1" data-bs-parent="#metodologiaAccordion">
+                    <div class="accordion-body small">
+                      <p>El tablero estudia la relación entre el <strong>Salario Mínimo Legal (SML)</strong> y resultados del mercado laboral paraguayo, combinando estadística descriptiva y una aproximación econométrica de evento para el fenómeno de <em>espiral salario-precios</em>.</p>
+                      <ul class="mb-0">
+                        <li>Unidad de análisis laboral: personas ocupadas (R02) con ponderación muestral.</li>
+                        <li>Unidad de análisis de hogares: condiciones de vivienda (R01), agregadas por trimestre.</li>
+                        <li>Unidad de análisis macro: series mensuales de índice general e índice de alimentos e hitos de ajuste del SML.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="met-h2">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#met-c2" aria-expanded="false" aria-controls="met-c2">
+                      2. Fuentes de datos e integración
+                    </button>
+                  </h2>
+                  <div id="met-c2" class="accordion-collapse collapse" aria-labelledby="met-h2" data-bs-parent="#metodologiaAccordion">
+                    <div class="accordion-body small">
+                      <p>El proceso integra tres fuentes con calendarios distintos:</p>
+                      <ol class="mb-2">
+                        <li><strong>EPHC REG02 (R02):</strong> empleo, ingresos y características personales.</li>
+                        <li><strong>EPHC REG01 (R01):</strong> vivienda y activos del hogar (internet, materiales, movilidad).</li>
+                        <li><strong>Serie macro mensual:</strong> IPC general, IPC alimentos y fechas de ajustes del SML.</li>
+                      </ol>
+                      <p class="mb-0">Para comparabilidad, los indicadores de hogares se consolidan a nivel trimestral y se enlazan con los indicadores laborales por etiqueta temporal <code>YYYYTrimQ</code>.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="met-h3">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#met-c3" aria-expanded="false" aria-controls="met-c3">
+                      3. Reglas de construcción de variables clave
+                    </button>
+                  </h2>
+                  <div id="met-c3" class="accordion-collapse collapse" aria-labelledby="met-h3" data-bs-parent="#metodologiaAccordion">
+                    <div class="accordion-body small">
+                      <ul class="mb-2">
+                        <li><strong>Franja relativa al SML:</strong> <code>Menos de 1 SML</code>, <code>1 SML</code>, <code>Más de 1 SML</code>, con tolerancia configurable (por defecto ±10%).</li>
+                        <li><strong>Formalidad:</strong> proxied por cotización a caja/IPS (<code>cotiza_bin</code>).</li>
+                        <li><strong>Vivienda (R01):</strong> internet hogar, material apto y movilidad propia del hogar.</li>
+                        <li><strong>Serie macro:</strong> inflación mensual calculada como variación porcentual del índice respecto al mes previo.</li>
+                      </ul>
+                      <p class="mb-0">Las etiquetas de categorías laborales se muestran siguiendo la convención usada en el documento metodológico base y en la recodificación del proyecto.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="met-h4">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#met-c4" aria-expanded="false" aria-controls="met-c4">
+                      4. Procedimiento econométrico de la vista “Espiral”
+                    </button>
+                  </h2>
+                  <div id="met-c4" class="accordion-collapse collapse" aria-labelledby="met-h4" data-bs-parent="#metodologiaAccordion">
+                    <div class="accordion-body small">
+                      <ol class="mb-2">
+                        <li>Se identifican eventos de ajuste del SML y se aplica umbral mínimo de ajuste (en puntos porcentuales).</li>
+                        <li>Se define un horizonte <code>h</code> meses pre/post y se calcula el efecto de evento: <strong>EI = media(post) - media(pre)</strong>.</li>
+                        <li>Se reportan resultados para IPC general y alimentos, además de un indicador de traspaso acumulado.</li>
+                        <li>Se ejecuta placebo Monte Carlo: se comparan los EI observados contra ventanas aleatorias sin evento.</li>
+                        <li>Se estima una curva simple de respuesta para simulación de escenarios de ajuste hipotético.</li>
+                      </ol>
+                      <p class="mb-0">La opción “Excluir solapados” busca mayor limpieza causal, evitando eventos muy cercanos dentro del horizonte seleccionado.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="met-h5">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#met-c5" aria-expanded="false" aria-controls="met-c5">
+                      5. Estadísticas, tablas y figuras incluidas en el tablero
+                    </button>
+                  </h2>
+                  <div id="met-c5" class="accordion-collapse collapse" aria-labelledby="met-h5" data-bs-parent="#metodologiaAccordion">
+                    <div class="accordion-body small">
+                      <ul class="mb-0">
+                        <li>KPIs centrales: población ponderada, salario promedio, formalidad, participación en 1 SML e informalidad crítica.</li>
+                        <li>Distribución por franjas y sexo, formalidad por franja, evolución salarial por sexo.</li>
+                        <li>Densidad de ingreso relativo al SML con banda resaltada (bunching alrededor de 1 SML).</li>
+                        <li>Series de educación y edad, mapa departamental de salario promedio ponderado.</li>
+                        <li>Contexto R02 + R01 con marcas de trimestres con ajuste del SML.</li>
+                        <li>Tabla de auditoría de eventos econométricos (fecha, ajuste, EI y traspaso).</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="met-h6">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#met-c6" aria-expanded="false" aria-controls="met-c6">
+                      6. Advertencias de uso, límites e interpretación
+                    </button>
+                  </h2>
+                  <div id="met-c6" class="accordion-collapse collapse" aria-labelledby="met-h6" data-bs-parent="#metodologiaAccordion">
+                    <div class="accordion-body small">
+                      <div class="alert alert-warning py-2 mb-2">
+                        <strong>Uso responsable:</strong> el tablero es una herramienta analítica y no sustituye una evaluación causal estructural completa.
+                      </div>
+                      <ul class="mb-0">
+                        <li>Resultados sensibles a filtros, horizonte, umbral de eventos y calidad muestral en subgrupos.</li>
+                        <li>El placebo aporta evidencia comparativa, pero no prueba causalidad definitiva por sí solo.</li>
+                        <li>Al trabajar con múltiples recortes, pueden aparecer celdas pequeñas y mayor volatilidad.</li>
+                        <li>Los indicadores R01 y R02 reflejan dimensiones distintas (hogar vs persona) y se interpretan en conjunto, no como equivalentes directos.</li>
+                        <li>El contenido no representa postura oficial del INE ni de ninguna institución pública.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 small text-muted">
+                <strong>Nota de autoría:</strong> implementación del tablero por Diego Bernardo Meza, con esta sección metodológica elaborada en colaboración con el enfoque original de Diego Daniel Sanabria.
+              </div>
+            </div>
+          </div>
+        </div> <!-- /metodologia tab -->
 
       </div>
 

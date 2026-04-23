@@ -330,6 +330,7 @@ function updateApp() {
   drawPlots();
   drawHousingPlots();
   updateEspiralDashboard();
+  updateMetodologiaMetadata();
 }
 
 function updateKPIs(sumWTotal) {
@@ -944,9 +945,11 @@ function loadEspiralData() {
 
       if (!espiralReady) {
         setEspiralStatusMessage("La base de espiral se cargó vacía.", true);
+        updateMetodologiaMetadata();
         return;
       }
       updateEspiralDashboard();
+      updateMetodologiaMetadata();
     }
   });
 }
@@ -981,8 +984,58 @@ function loadContextoR01Data() {
       }).filter(Boolean);
       contextoR01Ready = contextoR01.length > 0;
       updateEspiralDashboard();
+      updateMetodologiaMetadata();
     }
   });
+}
+
+function updateMetodologiaMetadata() {
+  const r02El = document.getElementById('met-r02-cov');
+  const r01El = document.getElementById('met-r01-cov');
+  const espEl = document.getElementById('met-esp-cov');
+  const evtEl = document.getElementById('met-events');
+  if (!r02El || !r01El || !espEl || !evtEl) return;
+
+  if (rawData.length > 0) {
+    const years = rawData.map(d => parseInt(d.anio, 10)).filter(v => Number.isFinite(v));
+    const minY = years.length ? Math.min(...years) : null;
+    const maxY = years.length ? Math.max(...years) : null;
+    const trimSet = new Set(rawData.map(d => `${d.anio}Trim${d.q}`));
+    r02El.textContent = minY && maxY ? `${minY}Trim1 a ${maxY}Trim4 (${trimSet.size} trimestres)` : `${trimSet.size} trimestres`;
+  } else {
+    r02El.textContent = "Sin datos";
+  }
+
+  if (contextoR01.length > 0) {
+    const keys = contextoR01.map(d => d.trimestredesc).filter(Boolean).sort((a, b) => {
+      const ma = a.match(/^(\d{4})Trim(\d)$/);
+      const mb = b.match(/^(\d{4})Trim(\d)$/);
+      if (!ma || !mb) return a.localeCompare(b);
+      const ya = parseInt(ma[1], 10), qa = parseInt(ma[2], 10);
+      const yb = parseInt(mb[1], 10), qb = parseInt(mb[2], 10);
+      return ya === yb ? qa - qb : ya - yb;
+    });
+    r01El.textContent = `${keys[0]} a ${keys[keys.length - 1]} (${keys.length} trimestres)`;
+  } else if (contextoR01Loading) {
+    r01El.textContent = "Cargando...";
+  } else {
+    r01El.textContent = "No disponible";
+  }
+
+  if (espiralData.length > 0) {
+    const minD = espiralData[0].fecha;
+    const maxD = espiralData[espiralData.length - 1].fecha;
+    const fmt = (d) => d.toISOString().slice(0, 7);
+    espEl.textContent = `${fmt(minD)} a ${fmt(maxD)} (${espiralData.length} meses)`;
+    const nEvents = espiralData.filter(d => d.ajuste_pp !== null && d.ajuste_pp > 0).length;
+    evtEl.textContent = `${nEvents} eventos`;
+  } else if (espiralLoading) {
+    espEl.textContent = "Cargando...";
+    evtEl.textContent = "Cargando...";
+  } else {
+    espEl.textContent = "No disponible";
+    evtEl.textContent = "No disponible";
+  }
 }
 
 function computeEspiralMetric(index, h) {
