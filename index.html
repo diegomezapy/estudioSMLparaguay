@@ -178,6 +178,9 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-bold text-dark" id="vivienda-tab" data-bs-toggle="tab" data-bs-target="#vivienda" type="button" role="tab"><i class="fas fa-home"></i> Viviendas y Bienestar</button>
         </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark" id="espiral-tab" data-bs-toggle="tab" data-bs-target="#espiral" type="button" role="tab"><i class="fas fa-wave-square"></i> Espiral SML-Precios</button>
+        </li>
       </ul>
 
       <!-- Tab panes -->
@@ -308,6 +311,22 @@
             </div>
           </div>
 
+          <div class="row mb-4">
+            <div class="col-12">
+              <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-3">
+                  <h5 class="card-title mb-0">Distribución de Ingreso Relativo al SML (Banda ±10%)</h5>
+                </div>
+                <div class="card-body p-0">
+                  <div id="plot-dens-rel-sml" style="height: 360px;"></div>
+                </div>
+                <div class="card-footer bg-light text-muted small border-top-0">
+                  <i class="fas fa-lightbulb text-warning"></i> <strong>Interpretación:</strong> Esta figura muestra el “bunching” alrededor de 1 SML y ayuda a visualizar cuánta población cae dentro de la franja regulatoria.
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Tabla Resumen -->
           <div class="row">
             <div class="col-12">
@@ -408,6 +427,137 @@
             </div>
           </div>
         </div> <!-- /viviendas tab -->
+
+        <!-- TAB ESPIRAL -->
+        <div class="tab-pane" id="espiral" role="tabpanel">
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light fw-bold text-dark">
+              <h5 class="card-title mb-0">Tablero Dinámico: Espiral Salario-Precios</h5>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info py-2 mb-3">
+                <strong>Qué mide:</strong> compara inflación media antes y después de ajustes del salario mínimo, con filtros de limpieza, placebo Monte Carlo y simulador de escenarios.
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                  <label class="form-label mb-1">Horizonte (meses pre/post)</label>
+                  <input type="range" class="form-range" id="esp-h" min="2" max="12" step="1" value="6">
+                  <small class="text-muted">h = <span id="esp-h-val">6</span></small>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label mb-1">Ajuste mínimo (pp)</label>
+                  <input type="range" class="form-range" id="esp-min-adj" min="0" max="20" step="0.5" value="0">
+                  <small class="text-muted">mín = <span id="esp-min-adj-val">0</span> pp</small>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label mb-1">Eventos solapados</label>
+                  <select class="form-select form-select-sm" id="esp-overlap">
+                    <option value="all" selected>Incluir todos</option>
+                    <option value="clean">Excluir solapados</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label mb-1">Placebo (repeticiones)</label>
+                  <input type="number" class="form-control form-control-sm" id="esp-placebo-reps" min="200" max="5000" step="100" value="1000">
+                </div>
+              </div>
+
+              <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Modo</label>
+                  <select class="form-select form-select-sm" id="esp-mode">
+                    <option value="analitico" selected>Analítico</option>
+                    <option value="presentacion">Presentación guiada</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Paso de la historia</label>
+                  <input type="range" class="form-range" id="esp-story-step" min="1" max="5" step="1" value="1">
+                  <small class="text-muted">Paso <span id="esp-story-step-val">1</span></small>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1 d-block">Serie de contexto</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    <div class="form-check"><input class="form-check-input esp-ctx" type="checkbox" value="pct_1sml" id="ctx-1sml" checked><label class="form-check-label small" for="ctx-1sml">% 1 SML (R02)</label></div>
+                    <div class="form-check"><input class="form-check-input esp-ctx" type="checkbox" value="pct_cotiza" id="ctx-cotiza" checked><label class="form-check-label small" for="ctx-cotiza">% formalidad (R02)</label></div>
+                    <div class="form-check"><input class="form-check-input esp-ctx" type="checkbox" value="pct_hogares_internet" id="ctx-int" checked><label class="form-check-label small" for="ctx-int">% internet hogar (R01)</label></div>
+                    <div class="form-check"><input class="form-check-input esp-ctx" type="checkbox" value="pct_hogares_material_apto" id="ctx-mat"><label class="form-check-label small" for="ctx-mat">% material apto (R01)</label></div>
+                    <div class="form-check"><input class="form-check-input esp-ctx" type="checkbox" value="pct_hogares_movilidad" id="ctx-mov"><label class="form-check-label small" for="ctx-mov">% movilidad (R01)</label></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                  <div class="card border-primary">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">Eventos usados</small>
+                      <h5 class="mb-0" id="esp-kpi-events">-</h5>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card border-success">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">EI IPC general</small>
+                      <h5 class="mb-0" id="esp-kpi-ei-gen">-</h5>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card border-warning">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">EI IPC alimentos</small>
+                      <h5 class="mb-0" id="esp-kpi-ei-food">-</h5>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card border-danger">
+                    <div class="card-body py-2">
+                      <small class="text-muted d-block">p-value placebo (gen)</small>
+                      <h5 class="mb-0" id="esp-kpi-pgen">-</h5>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-lg-7"><div class="card border-0 shadow-sm"><div class="card-body p-2"><div id="esp-plot-event" style="height: 340px;"></div></div></div></div>
+                <div class="col-lg-5"><div class="card border-0 shadow-sm"><div class="card-body p-2"><div id="esp-plot-placebo" style="height: 340px;"></div></div></div></div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6"><div class="card border-0 shadow-sm"><div class="card-body p-2"><div id="esp-plot-sim" style="height: 320px;"></div></div></div></div>
+                <div class="col-lg-6"><div class="card border-0 shadow-sm"><div class="card-body p-2"><div id="esp-plot-context" style="height: 320px;"></div></div></div></div>
+              </div>
+
+              <div class="card border-0 bg-light mb-3">
+                <div class="card-body py-2">
+                  <div id="esp-story-text" class="small text-muted">Cargando análisis de espiral...</div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Evento</th>
+                      <th>Fecha</th>
+                      <th>Ajuste (pp)</th>
+                      <th>EI IPC general</th>
+                      <th>EI IPC alimentos</th>
+                      <th>CT general</th>
+                      <th>CT alimentos</th>
+                    </tr>
+                  </thead>
+                  <tbody id="esp-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div> <!-- /espiral tab -->
 
       </div>
 

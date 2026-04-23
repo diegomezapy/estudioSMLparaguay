@@ -1,19 +1,27 @@
 // Estado Global
 let rawData = [];
 let filteredData = [];
+let espiralData = [];
+let espiralReady = false;
+let espiralLoading = false;
+let espiralControlsReady = false;
+let contextoR01 = [];
+let contextoR01Ready = false;
+let contextoR01Loading = false;
+const espiralCache = new Map();
 
 // Diccionario de Variables (EPHC INE)
 const DICT = {
   rama_pea: {
-    1: "Agricultura y Ganadería",
-    2: "Industria y Minería",
-    3: "Electricidad, Gas y Agua",
+    1: "Agro/Pesca",
+    2: "Manufactura",
+    3: "Energía/Agua",
     4: "Construcción",
-    5: "Comercio y Hoteles",
-    6: "Transporte y Comunicaciones",
-    7: "Finanzas e Inmuebles",
-    8: "Servicios Sociales y Personales",
-    9: "No Especificado"
+    5: "Comercio/Hoteles",
+    6: "Transporte/Almacén",
+    7: "Finanzas/Inmuebles",
+    8: "Servicios",
+    99: "NR"
   },
   ocup_pea: {
     1: "Poder Ejecutivo y Directivos",
@@ -29,9 +37,13 @@ const DICT = {
     99: "No Especificado"
   },
   cate_pea: {
-    1: "1 - Empleado/a", 2: "2 - Obrero/a", 3: "3 - Patrón/a",
-    4: "4 - Empleado/a público", 5: "5 - Cuenta propia", 6: "6 - Familiar no remun.",
-    7: "7 - Empleado/a doméstico", 8: "8 - Trabajador/a no remun.", 9: "9 - Otros"
+    1: "Obrero público",
+    2: "Obrero privado",
+    3: "Empleador/patrón",
+    4: "Cuenta propia",
+    5: "Trabajador fam. no remun.",
+    6: "Doméstico/a",
+    9: "NR"
   },
   dptorep: {
     0: "Asunción", 1: "Concepción", 2: "San Pedro", 3: "Cordillera", 4: "Guairá",
@@ -69,6 +81,26 @@ const els = {
 
 // Utilidades
 const formatGs = (num) => new Intl.NumberFormat('es-PY').format(Math.round(num));
+const toNumber = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const mean = (arr) => {
+  if (!arr || arr.length === 0) return null;
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) s += arr[i];
+  return s / arr.length;
+};
+const sum = (arr) => {
+  if (!arr || arr.length === 0) return null;
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) s += arr[i];
+  return s;
+};
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+const formatPP = (v) => (v === null || !Number.isFinite(v) ? "-" : `${v >= 0 ? "+" : ""}${v.toFixed(2)} pp`);
+
 const calcWMean = (data, valKey, wKey) => {
   let sumW = 0, sumV = 0;
   for(let i=0; i<data.length; i++) {
@@ -150,7 +182,7 @@ function processData(data) {
   
   document.querySelectorAll('.filter-q').forEach(el => el.addEventListener('change', updateApp));
   document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => {
-    if (el.id !== 'toggle-real') {
+    if (el.id !== 'toggle-real' && !el.classList.contains('esp-ctx')) {
       el.addEventListener('change', updateApp);
     }
   });
@@ -182,6 +214,11 @@ function processData(data) {
   els.tolSlider.addEventListener('input', (e) => {
     els.tolVal.textContent = e.target.value;
   });
+
+  setupEspiralControls();
+  setupEspiralTabResize();
+  loadEspiralData();
+  loadContextoR01Data();
 
   updateApp();
 }
@@ -292,6 +329,7 @@ function updateApp() {
   updateKPIs(sumWTotal);
   drawPlots();
   drawHousingPlots();
+  updateEspiralDashboard();
 }
 
 function updateKPIs(sumWTotal) {
@@ -351,6 +389,7 @@ function drawPlots() {
     Plotly.purge('plot-dist');
     Plotly.purge('plot-formal');
     Plotly.purge('plot-sal');
+    Plotly.purge('plot-dens-rel-sml');
     document.getElementById('summary-table-body').innerHTML = '';
     return;
   }
@@ -430,6 +469,9 @@ function drawPlots() {
   tracesSal.push(smlLine);
   Plotly.newPlot('plot-sal', tracesSal, { margin: {t:20, b:40, l:60, r:10}, legend: {orientation: 'h', y: -0.2} }, {responsive: true});
 
+  // 4. Densidad relativa al SML (idea del Rmd)
+  drawDensityRelSML();
+
   // ================= TABLA RESUMEN ==================
   drawTable(trimestres, generos);
   
@@ -438,6 +480,65 @@ function drawPlots() {
   
   // ================= TAB MAPAS ==================
   drawMap(filteredData);
+}
+
+function drawDensityRelSML() {
+  const plotId = 'plot-dens-rel-sml';
+  if (!document.getElementById(plotId)) return;
+
+  const tol = parseFloat(els.tolSlider.value) / 100;
+  const lo = 1 - tol;
+  const hi = 1 + tol;
+
+  const rows = filteredData
+    .map(d => ({ x: d.ratio_sml_plot, w: d.w || 0 }))
+    .filter(d => Number.isFinite(d.x) && d.x > 0 && d.x < 2.5 && d.w > 0);
+
+  if (rows.length === 0) {
+    renderEmptyPlot(plotId, "Distribución relativa al SML", "No hay datos válidos para la densidad.");
+    return;
+  }
+
+  const inside = rows.filter(d => d.x >= lo && d.x <= hi);
+  const outside = rows.filter(d => d.x < lo || d.x > hi);
+
+  const traces = [
+    {
+      x: outside.map(d => d.x),
+      y: outside.map(d => d.w),
+      type: 'histogram',
+      histfunc: 'sum',
+      nbinsx: 80,
+      name: 'Fuera de banda',
+      marker: { color: '#9ecae1' },
+      opacity: 0.85
+    },
+    {
+      x: inside.map(d => d.x),
+      y: inside.map(d => d.w),
+      type: 'histogram',
+      histfunc: 'sum',
+      nbinsx: 80,
+      name: 'Dentro de banda ±tol',
+      marker: { color: '#2ca25f' },
+      opacity: 0.90
+    }
+  ];
+
+  Plotly.newPlot(plotId, traces, {
+    barmode: 'overlay',
+    title: { text: `Ingreso / SML con banda ±${Math.round(tol * 100)}%`, font: { size: 14 } },
+    xaxis: { title: 'Ingreso relativo al SML', range: [0, 2.5] },
+    yaxis: { title: 'Frecuencia ponderada' },
+    shapes: [
+      { type: 'rect', x0: lo, x1: hi, y0: 0, y1: 1, yref: 'paper', fillcolor: '#2ca25f', opacity: 0.08, line: { width: 0 } },
+      { type: 'line', x0: 1, x1: 1, y0: 0, y1: 1, yref: 'paper', line: { color: '#1b7837', dash: 'dash', width: 2 } },
+      { type: 'line', x0: lo, x1: lo, y0: 0, y1: 1, yref: 'paper', line: { color: '#1b7837', dash: 'dot', width: 1 } },
+      { type: 'line', x0: hi, x1: hi, y0: 0, y1: 1, yref: 'paper', line: { color: '#1b7837', dash: 'dot', width: 1 } }
+    ],
+    margin: { t: 45, b: 45, l: 60, r: 20 },
+    legend: { orientation: 'h', y: -0.2 }
+  }, { responsive: true, displayModeBar: false });
 }
 
 function drawDemografia(data, trimestres) {
@@ -674,6 +775,728 @@ function drawHousingPlots() {
   if(document.getElementById('plot-piso')) {
     Plotly.newPlot('plot-piso', getTraces('piso'), layoutTpl('Vivienda con Pisos de Materiales Aptos (%)'), { responsive: true, displayModeBar: false });
   }
+}
+
+function setupEspiralControls() {
+  if (espiralControlsReady) return;
+  const hEl = document.getElementById('esp-h');
+  const minAdjEl = document.getElementById('esp-min-adj');
+  const overlapEl = document.getElementById('esp-overlap');
+  const repsEl = document.getElementById('esp-placebo-reps');
+  const modeEl = document.getElementById('esp-mode');
+  const storyStepEl = document.getElementById('esp-story-step');
+  if (!hEl || !minAdjEl || !overlapEl || !repsEl || !modeEl || !storyStepEl) return;
+
+  espiralControlsReady = true;
+
+  hEl.addEventListener('input', () => {
+    syncEspiralLabels();
+    updateEspiralDashboard();
+  });
+  minAdjEl.addEventListener('input', () => {
+    syncEspiralLabels();
+    updateEspiralDashboard();
+  });
+  overlapEl.addEventListener('change', updateEspiralDashboard);
+
+  repsEl.addEventListener('change', () => {
+    const clean = clamp(parseInt(repsEl.value || "1000", 10), 200, 5000);
+    repsEl.value = clean;
+    updateEspiralDashboard();
+  });
+
+  modeEl.addEventListener('change', () => {
+    setEspiralStoryPresetIfNeeded();
+    syncEspiralLabels();
+    updateEspiralDashboard();
+  });
+
+  storyStepEl.addEventListener('input', () => {
+    setEspiralStoryPresetIfNeeded();
+    syncEspiralLabels();
+    updateEspiralDashboard();
+  });
+
+  document.querySelectorAll('.esp-ctx').forEach(el => {
+    el.addEventListener('change', updateEspiralDashboard);
+  });
+
+  setEspiralStoryPresetIfNeeded();
+  syncEspiralLabels();
+}
+
+function setupEspiralTabResize() {
+  const tabBtn = document.getElementById('espiral-tab');
+  if (!tabBtn || tabBtn.dataset.resizeBound === "1") return;
+  tabBtn.dataset.resizeBound = "1";
+  tabBtn.addEventListener('shown.bs.tab', () => {
+    ['esp-plot-event', 'esp-plot-placebo', 'esp-plot-sim', 'esp-plot-context'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && typeof Plotly !== "undefined") Plotly.Plots.resize(el);
+    });
+  });
+}
+
+function syncEspiralLabels() {
+  const hEl = document.getElementById('esp-h');
+  const minAdjEl = document.getElementById('esp-min-adj');
+  const storyStepEl = document.getElementById('esp-story-step');
+  const hVal = document.getElementById('esp-h-val');
+  const minAdjVal = document.getElementById('esp-min-adj-val');
+  const stepVal = document.getElementById('esp-story-step-val');
+  if (hEl && hVal) hVal.textContent = hEl.value;
+  if (minAdjEl && minAdjVal) minAdjVal.textContent = minAdjEl.value;
+  if (storyStepEl && stepVal) stepVal.textContent = storyStepEl.value;
+}
+
+function setEspiralStoryPresetIfNeeded() {
+  const modeEl = document.getElementById('esp-mode');
+  const stepEl = document.getElementById('esp-story-step');
+  const hEl = document.getElementById('esp-h');
+  const minAdjEl = document.getElementById('esp-min-adj');
+  const overlapEl = document.getElementById('esp-overlap');
+  if (!modeEl || !stepEl || !hEl || !minAdjEl || !overlapEl) return;
+
+  const inPresentation = modeEl.value === "presentacion";
+  [hEl, minAdjEl, overlapEl].forEach(el => el.disabled = inPresentation);
+  if (!inPresentation) return;
+
+  const presets = {
+    1: { h: 3, minAdj: 0, overlap: "all", ctx: ["pct_1sml"] },
+    2: { h: 6, minAdj: 0, overlap: "all", ctx: ["pct_1sml", "pct_cotiza"] },
+    3: { h: 6, minAdj: 3, overlap: "clean", ctx: ["pct_1sml", "pct_cotiza"] },
+    4: { h: 9, minAdj: 4, overlap: "clean", ctx: ["pct_1sml", "pct_cotiza", "pct_hogares_internet", "pct_hogares_material_apto"] },
+    5: { h: 12, minAdj: 0, overlap: "clean", ctx: ["pct_1sml", "pct_cotiza", "pct_hogares_internet", "pct_hogares_material_apto", "pct_hogares_movilidad"] }
+  };
+
+  const step = clamp(parseInt(stepEl.value || "1", 10), 1, 5);
+  const p = presets[step] || presets[1];
+  hEl.value = p.h;
+  minAdjEl.value = p.minAdj;
+  overlapEl.value = p.overlap;
+  document.querySelectorAll('.esp-ctx').forEach(chk => {
+    chk.checked = p.ctx.includes(chk.value);
+  });
+}
+
+function getEspiralParams() {
+  const hEl = document.getElementById('esp-h');
+  const minAdjEl = document.getElementById('esp-min-adj');
+  const overlapEl = document.getElementById('esp-overlap');
+  const repsEl = document.getElementById('esp-placebo-reps');
+  const modeEl = document.getElementById('esp-mode');
+  const stepEl = document.getElementById('esp-story-step');
+  const contextSeries = Array.from(document.querySelectorAll('.esp-ctx:checked')).map(el => el.value);
+  return {
+    h: clamp(parseInt(hEl ? hEl.value : "6", 10), 2, 12),
+    minAdj: clamp(parseFloat(minAdjEl ? minAdjEl.value : "0"), 0, 20),
+    overlap: overlapEl ? overlapEl.value : "all",
+    reps: clamp(parseInt(repsEl ? repsEl.value : "1000", 10), 200, 5000),
+    mode: modeEl ? modeEl.value : "analitico",
+    step: clamp(parseInt(stepEl ? stepEl.value : "1", 10), 1, 5),
+    contextSeries
+  };
+}
+
+function setEspiralStatusMessage(msg, isError = false) {
+  const el = document.getElementById('esp-story-text');
+  if (!el) return;
+  el.classList.toggle('text-danger', isError);
+  el.classList.toggle('text-muted', !isError);
+  el.textContent = msg;
+}
+
+function loadEspiralData() {
+  if (espiralReady || espiralLoading) return;
+  espiralLoading = true;
+  setEspiralStatusMessage("Cargando serie macro de IPC y ajustes de salario mínimo...");
+
+  Papa.parse('data/espiral_salario_precios.csv', {
+    download: true,
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    error: function(err) {
+      espiralLoading = false;
+      console.error("No se pudo cargar espiral_salario_precios.csv:", err);
+      setEspiralStatusMessage("No se pudo cargar la base de espiral (data/espiral_salario_precios.csv).", true);
+    },
+    complete: function(results) {
+      espiralLoading = false;
+      const parsed = (results.data || []).map(row => {
+        const d = row && row.fecha ? new Date(`${row.fecha}T00:00:00`) : null;
+        if (!d || Number.isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        const q = Math.floor(d.getMonth() / 3) + 1;
+        return {
+          fecha: d,
+          periodo: row.periodo || "",
+          ajuste_pp: toNumber(row.ajuste_pp),
+          ipc_general_m: toNumber(row.ipc_general_m),
+          ipc_alim_m: toNumber(row.ipc_alim_m),
+          quarter: `${year}-Q${q}`
+        };
+      }).filter(Boolean).sort((a, b) => a.fecha - b.fecha);
+
+      espiralData = parsed;
+      espiralReady = parsed.length > 0;
+      espiralCache.clear();
+
+      if (!espiralReady) {
+        setEspiralStatusMessage("La base de espiral se cargó vacía.", true);
+        return;
+      }
+      updateEspiralDashboard();
+    }
+  });
+}
+
+function loadContextoR01Data() {
+  if (contextoR01Ready || contextoR01Loading) return;
+  contextoR01Loading = true;
+
+  Papa.parse('data/contexto_r01.csv', {
+    download: true,
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    error: function(err) {
+      contextoR01Loading = false;
+      console.warn("No se pudo cargar data/contexto_r01.csv:", err);
+    },
+    complete: function(results) {
+      contextoR01Loading = false;
+      contextoR01 = (results.data || []).map(row => {
+        const year = parseInt(row.year, 10);
+        const quarter = parseInt(row.quarter, 10);
+        const trimestredesc = row.trimestredesc || (Number.isFinite(year) && Number.isFinite(quarter) ? `${year}Trim${quarter}` : null);
+        if (!trimestredesc) return null;
+        return {
+          trimestredesc,
+          pct_hogares_internet: toNumber(row.pct_hogares_internet),
+          pct_hogares_material_apto: toNumber(row.pct_hogares_material_apto),
+          pct_hogares_movilidad: toNumber(row.pct_hogares_movilidad),
+          n_hogares: toNumber(row.n_hogares)
+        };
+      }).filter(Boolean);
+      contextoR01Ready = contextoR01.length > 0;
+      updateEspiralDashboard();
+    }
+  });
+}
+
+function computeEspiralMetric(index, h) {
+  if (index - h < 0 || index + h >= espiralData.length) return null;
+  const row0 = espiralData[index];
+  if (!row0) return null;
+
+  const preG = [];
+  const postG = [];
+  const preF = [];
+  const postF = [];
+  const relGeneral = [];
+  const relFood = [];
+
+  for (let k = -h; k <= h; k++) {
+    const r = espiralData[index + k];
+    const g = toNumber(r ? r.ipc_general_m : null);
+    const f = toNumber(r ? r.ipc_alim_m : null);
+    relGeneral.push(g);
+    relFood.push(f);
+    if (k < 0) {
+      if (g !== null) preG.push(g);
+      if (f !== null) preF.push(f);
+    }
+    if (k > 0) {
+      if (g !== null) postG.push(g);
+      if (f !== null) postF.push(f);
+    }
+  }
+
+  const preMeanG = mean(preG);
+  const preMeanF = mean(preF);
+  const postMeanG = mean(postG);
+  const postMeanF = mean(postF);
+
+  return {
+    date: row0.fecha,
+    ajuste: toNumber(row0.ajuste_pp),
+    eiGeneral: preMeanG === null || postMeanG === null ? null : (postMeanG - preMeanG),
+    eiFood: preMeanF === null || postMeanF === null ? null : (postMeanF - preMeanF),
+    ctGeneral: preG.length === 0 || postG.length === 0 ? null : (sum(postG) - sum(preG)),
+    ctFood: preF.length === 0 || postF.length === 0 ? null : (sum(postF) - sum(preF)),
+    relGeneral: relGeneral.map(v => (v === null || preMeanG === null ? null : (v - preMeanG))),
+    relFood: relFood.map(v => (v === null || preMeanF === null ? null : (v - preMeanF)))
+  };
+}
+
+function seededRng(seed) {
+  let t = seed >>> 0;
+  return function() {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function sampleWithoutReplacement(pool, n, rng) {
+  if (n >= pool.length) return pool.slice();
+  const copy = pool.slice();
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(rng() * (copy.length - i));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy.slice(0, n);
+}
+
+function fitLine(xs, ys) {
+  if (!xs || xs.length === 0 || xs.length !== ys.length) return null;
+  if (xs.length === 1) return { a: ys[0], b: 0 };
+  const mx = mean(xs);
+  const my = mean(ys);
+  let cov = 0;
+  let varX = 0;
+  for (let i = 0; i < xs.length; i++) {
+    const dx = xs[i] - mx;
+    cov += dx * (ys[i] - my);
+    varX += dx * dx;
+  }
+  if (varX === 0) return { a: my, b: 0 };
+  const b = cov / varX;
+  return { a: my - b * mx, b };
+}
+
+function computeEspiralResults(params) {
+  if (!espiralReady || espiralData.length === 0) return null;
+
+  const cacheKey = [params.h, params.minAdj.toFixed(1), params.overlap, params.reps].join("|");
+  if (espiralCache.has(cacheKey)) return espiralCache.get(cacheKey);
+
+  const n = espiralData.length;
+  const allEventIdx = [];
+  const selectedEventIdx = [];
+  for (let i = params.h; i < n - params.h; i++) {
+    const adj = toNumber(espiralData[i].ajuste_pp);
+    if (adj !== null && adj > 0) allEventIdx.push(i);
+    if (adj !== null && adj >= params.minAdj) selectedEventIdx.push(i);
+  }
+
+  let cleanEventIdx = selectedEventIdx;
+  if (params.overlap === "clean") {
+    cleanEventIdx = selectedEventIdx.filter(i => selectedEventIdx.every(j => i === j || Math.abs(i - j) > params.h));
+  }
+
+  const metricMemo = new Map();
+  const getMetric = (idx) => {
+    if (!metricMemo.has(idx)) metricMemo.set(idx, computeEspiralMetric(idx, params.h));
+    return metricMemo.get(idx);
+  };
+
+  const events = cleanEventIdx.map(getMetric).filter(Boolean);
+  const ks = Array.from({ length: params.h * 2 + 1 }, (_, i) => i - params.h);
+
+  const eiGeneral = mean(events.map(e => e.eiGeneral).filter(v => v !== null));
+  const eiFood = mean(events.map(e => e.eiFood).filter(v => v !== null));
+  const ctGeneral = mean(events.map(e => e.ctGeneral).filter(v => v !== null));
+  const ctFood = mean(events.map(e => e.ctFood).filter(v => v !== null));
+
+  const relGeneral = ks.map((_, idx) => mean(events.map(e => e.relGeneral[idx]).filter(v => v !== null)));
+  const relFood = ks.map((_, idx) => mean(events.map(e => e.relFood[idx]).filter(v => v !== null)));
+
+  const realEventSet = new Set(allEventIdx);
+  const candidates = [];
+  for (let i = params.h; i < n - params.h; i++) {
+    if (realEventSet.has(i)) continue;
+    if (params.overlap === "clean" && allEventIdx.some(ev => Math.abs(ev - i) <= params.h)) continue;
+    candidates.push(i);
+  }
+
+  const placeboDist = [];
+  const drawSize = Math.min(events.length, candidates.length);
+  if (drawSize > 0) {
+    const rng = seededRng(20260423 + params.h * 11 + Math.round(params.minAdj * 10) * 31 + (params.overlap === "clean" ? 73 : 41));
+    for (let r = 0; r < params.reps; r++) {
+      const picked = sampleWithoutReplacement(candidates, drawSize, rng);
+      const vals = picked.map(getMetric).filter(Boolean).map(m => m.eiGeneral).filter(v => v !== null);
+      if (vals.length > 0) placeboDist.push(mean(vals));
+    }
+  }
+
+  const pValueGeneral = placeboDist.length > 0 && eiGeneral !== null
+    ? (placeboDist.filter(v => Math.abs(v) >= Math.abs(eiGeneral)).length / placeboDist.length)
+    : null;
+
+  const fitSample = events.filter(e => e.ajuste !== null && e.eiGeneral !== null && e.eiFood !== null);
+  const xs = fitSample.map(e => e.ajuste);
+  const yg = fitSample.map(e => e.eiGeneral);
+  const yf = fitSample.map(e => e.eiFood);
+  const fitG = fitLine(xs, yg);
+  const fitF = fitLine(xs, yf);
+  const simLevels = [3, 5, 8, 12, 15];
+  const simScenarios = simLevels.map(level => ({
+    adj: level,
+    general: fitG ? (fitG.a + fitG.b * level) : null,
+    food: fitF ? (fitF.a + fitF.b * level) : null
+  }));
+
+  const result = {
+    events,
+    ks,
+    relGeneral,
+    relFood,
+    eiGeneral,
+    eiFood,
+    ctGeneral,
+    ctFood,
+    placeboDist,
+    pValueGeneral,
+    simScenarios
+  };
+  espiralCache.set(cacheKey, result);
+  return result;
+}
+
+function buildEspiralContextRows() {
+  if (filteredData.length === 0) return [];
+
+  const labor = {};
+  filteredData.forEach(d => {
+    const key = `${d.anio}Trim${d.q}`;
+    if (!labor[key]) labor[key] = { w: 0, w1sml: 0, wCot: 0 };
+    const w = d.w || 0;
+    if (w <= 0) return;
+    labor[key].w += w;
+    if (d.ingoc1sml_cat === "1 SML") labor[key].w1sml += w;
+    if (d.cotiza_bin === 1) labor[key].wCot += w;
+  });
+
+  const r01Map = {};
+  contextoR01.forEach(r => {
+    r01Map[r.trimestredesc] = r;
+  });
+
+  const macro = {};
+  espiralData.forEach(r => {
+    if (r.ipc_general_m === null || !r.fecha) return;
+    const y = r.fecha.getFullYear();
+    const q = Math.floor(r.fecha.getMonth() / 3) + 1;
+    const key = `${y}Trim${q}`;
+    if (!macro[key]) macro[key] = { s: 0, n: 0 };
+    macro[key].s += r.ipc_general_m;
+    macro[key].n += 1;
+  });
+
+  const keys = Object.keys(labor).sort((a, b) => {
+    const ma = a.match(/^(\d{4})Trim(\d)$/);
+    const mb = b.match(/^(\d{4})Trim(\d)$/);
+    if (!ma || !mb) return a.localeCompare(b);
+    const ya = parseInt(ma[1], 10), qa = parseInt(ma[2], 10);
+    const yb = parseInt(mb[1], 10), qb = parseInt(mb[2], 10);
+    return ya === yb ? qa - qb : ya - yb;
+  });
+
+  return keys.map(k => ({
+    quarter: k,
+    pct_1sml: labor[k].w > 0 ? (labor[k].w1sml / labor[k].w) * 100 : null,
+    pct_cotiza: labor[k].w > 0 ? (labor[k].wCot / labor[k].w) * 100 : null,
+    pct_hogares_internet: r01Map[k] ? r01Map[k].pct_hogares_internet : null,
+    pct_hogares_material_apto: r01Map[k] ? r01Map[k].pct_hogares_material_apto : null,
+    pct_hogares_movilidad: r01Map[k] ? r01Map[k].pct_hogares_movilidad : null,
+    ipc_general_q: macro[k] && macro[k].n > 0 ? (macro[k].s / macro[k].n) : null
+  }));
+}
+
+function renderEmptyPlot(id, title, message) {
+  Plotly.newPlot(id, [], {
+    title: { text: title, font: { size: 14 } },
+    xaxis: { visible: false },
+    yaxis: { visible: false },
+    annotations: [{
+      x: 0.5, y: 0.5, xref: "paper", yref: "paper",
+      text: message, showarrow: false, font: { size: 13, color: "#6c757d" }
+    }],
+    margin: { t: 40, b: 20, l: 20, r: 20 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderEspiralEventPlot(results) {
+  if (!results || results.events.length === 0) {
+    renderEmptyPlot('esp-plot-event', 'Event Study', 'No hay eventos válidos con estos filtros.');
+    return;
+  }
+
+  const traces = [
+    {
+      x: results.ks,
+      y: results.relGeneral,
+      name: "IPC general",
+      type: "scatter",
+      mode: "lines+markers",
+      line: { color: "#2E86DE", width: 3, shape: "spline" },
+      marker: { size: 7 }
+    },
+    {
+      x: results.ks,
+      y: results.relFood,
+      name: "IPC alimentos",
+      type: "scatter",
+      mode: "lines+markers",
+      line: { color: "#E67E22", width: 3, shape: "spline" },
+      marker: { size: 7 }
+    }
+  ];
+
+  Plotly.newPlot('esp-plot-event', traces, {
+    title: { text: "Inflación mensual relativa al promedio pre-evento (pp)", font: { size: 14 } },
+    xaxis: { title: "Meses relativos al ajuste (k)" },
+    yaxis: { title: "Diferencia vs pre-evento (pp)" },
+    shapes: [
+      { type: "line", x0: 0, x1: 0, y0: 0, y1: 1, yref: "paper", line: { color: "#7f8c8d", dash: "dot" } },
+      { type: "line", x0: Math.min(...results.ks), x1: Math.max(...results.ks), y0: 0, y1: 0, line: { color: "#bdc3c7", dash: "dash" } }
+    ],
+    margin: { t: 45, b: 45, l: 60, r: 20 },
+    legend: { orientation: "h", y: -0.25 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderEspiralPlaceboPlot(results) {
+  if (!results || results.placeboDist.length === 0) {
+    renderEmptyPlot('esp-plot-placebo', 'Placebo Monte Carlo', 'Sin simulaciones disponibles para esta configuración.');
+    return;
+  }
+
+  const obs = results.eiGeneral;
+  Plotly.newPlot('esp-plot-placebo', [{
+    x: results.placeboDist,
+    type: "histogram",
+    nbinsx: 35,
+    marker: { color: "#95a5a6", opacity: 0.85 },
+    name: "Distribución placebo"
+  }], {
+    title: { text: "Distribución placebo del EI (IPC general)", font: { size: 14 } },
+    xaxis: { title: "EI placebo (pp)" },
+    yaxis: { title: "Frecuencia" },
+    shapes: obs === null ? [] : [{
+      type: "line", x0: obs, x1: obs, y0: 0, y1: 1, yref: "paper",
+      line: { color: "#C0392B", width: 2 }
+    }],
+    annotations: obs === null ? [] : [{
+      x: obs, y: 1.05, xref: "x", yref: "paper", showarrow: false,
+      text: `EI observado = ${formatPP(obs)}`
+    }],
+    margin: { t: 45, b: 45, l: 55, r: 20 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderEspiralSimPlot(results) {
+  const rows = results ? results.simScenarios.filter(r => r.general !== null || r.food !== null) : [];
+  if (!rows || rows.length === 0) {
+    renderEmptyPlot('esp-plot-sim', 'Simulador', 'No hay suficiente variación de eventos para estimar escenarios.');
+    return;
+  }
+
+  const labels = rows.map(r => `+${r.adj} pp`);
+  Plotly.newPlot('esp-plot-sim', [
+    {
+      x: labels,
+      y: rows.map(r => r.general),
+      type: "bar",
+      name: "IPC general estimado",
+      marker: { color: "#2E86DE" }
+    },
+    {
+      x: labels,
+      y: rows.map(r => r.food),
+      type: "bar",
+      name: "IPC alimentos estimado",
+      marker: { color: "#E67E22" }
+    }
+  ], {
+    title: { text: "Simulación: respuesta esperada del EI por tamaño del ajuste", font: { size: 14 } },
+    xaxis: { title: "Ajuste hipotético del SML" },
+    yaxis: { title: "EI esperado (pp)" },
+    barmode: "group",
+    margin: { t: 45, b: 45, l: 60, r: 20 },
+    legend: { orientation: "h", y: -0.25 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderEspiralContextPlot(params) {
+  const rows = buildEspiralContextRows();
+  if (rows.length === 0) {
+    renderEmptyPlot('esp-plot-context', 'Contexto social y laboral', 'No hay datos en el filtro actual para construir contexto.');
+    return;
+  }
+
+  const labelMap = {
+    pct_1sml: "% en 1 SML (R02)",
+    pct_cotiza: "% formalidad laboral (R02)",
+    pct_hogares_internet: "% hogares con internet (R01)",
+    pct_hogares_material_apto: "% hogares con material apto (R01)",
+    pct_hogares_movilidad: "% hogares con movilidad (R01)"
+  };
+  const colMap = {
+    pct_1sml: "#117a65",
+    pct_cotiza: "#7b241c",
+    pct_hogares_internet: "#1f618d",
+    pct_hogares_material_apto: "#884ea0",
+    pct_hogares_movilidad: "#ca6f1e"
+  };
+
+  const traces = [];
+  params.contextSeries.forEach(key => {
+    if (!labelMap[key]) return;
+    traces.push({
+      x: rows.map(r => r.quarter),
+      y: rows.map(r => r[key]),
+      name: labelMap[key],
+      type: "scatter",
+      mode: "lines+markers",
+      line: { width: 3, shape: "spline", color: colMap[key] },
+      marker: { size: 7 }
+    });
+  });
+
+  const hasIpc = rows.some(r => r.ipc_general_q !== null);
+  if (hasIpc) {
+    traces.push({
+      x: rows.map(r => r.quarter),
+      y: rows.map(r => r.ipc_general_q),
+      name: "IPC general trimestral (promedio mensual)",
+      type: "scatter",
+      mode: "lines+markers",
+      line: { color: "#E74C3C", dash: "dot", width: 2 },
+      marker: { size: 6 },
+      yaxis: "y2"
+    });
+  }
+
+  const contextVals = rows.flatMap(r => params.contextSeries.map(k => r[k])).filter(v => v !== null && Number.isFinite(v));
+  const markY = contextVals.length > 0 ? (Math.max(...contextVals) + 2) : 98;
+
+  const eventTrims = new Set(
+    espiralData
+      .filter(r => r.ajuste_pp !== null && r.ajuste_pp > 0)
+      .map(r => `${r.fecha.getFullYear()}Trim${Math.floor(r.fecha.getMonth() / 3) + 1}`)
+  );
+  const marks = rows.filter(r => eventTrims.has(r.quarter));
+  if (marks.length > 0) {
+    traces.push({
+      x: marks.map(r => r.quarter),
+      y: marks.map(() => markY),
+      name: "Trimestres con ajuste SML",
+      type: "scatter",
+      mode: "markers",
+      marker: { symbol: "diamond", size: 9, color: "#1f618d" }
+    });
+  }
+
+  if (traces.length === 0) {
+    renderEmptyPlot('esp-plot-context', 'Contexto social y laboral', 'Activa al menos una serie de contexto.');
+    return;
+  }
+
+  Plotly.newPlot('esp-plot-context', traces, {
+    title: { text: "Contexto laboral y de hogares con marcas de ajuste SML", font: { size: 14 } },
+    xaxis: { title: "Trimestre" },
+    yaxis: { title: "Indicadores de contexto (%)", rangemode: "tozero" },
+    yaxis2: {
+      title: "IPC general mensual promedio (%)",
+      overlaying: "y",
+      side: "right",
+      showgrid: false
+    },
+    margin: { t: 45, b: 45, l: 60, r: 70 },
+    legend: { orientation: "h", y: -0.3 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderEspiralTable(results) {
+  const tbody = document.getElementById('esp-table-body');
+  if (!tbody) return;
+  if (!results || results.events.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin eventos válidos para esta configuración.</td></tr>';
+    return;
+  }
+
+  const rows = results.events.map(ev => {
+    const dateTxt = ev.date ? ev.date.toISOString().slice(0, 10) : "-";
+    return `<tr>
+      <td>Ajuste SML</td>
+      <td>${dateTxt}</td>
+      <td class="text-end">${formatPP(ev.ajuste)}</td>
+      <td class="text-end">${formatPP(ev.eiGeneral)}</td>
+      <td class="text-end">${formatPP(ev.eiFood)}</td>
+      <td class="text-end">${formatPP(ev.ctGeneral)}</td>
+      <td class="text-end">${formatPP(ev.ctFood)}</td>
+    </tr>`;
+  }).join("");
+  tbody.innerHTML = rows;
+}
+
+function renderEspiralStory(results, params) {
+  const el = document.getElementById('esp-story-text');
+  if (!el) return;
+  const maxR02 = rawData.length > 0 ? Math.max(...rawData.map(d => parseInt(d.anio, 10) || 0)) : null;
+  const maxR01 = contextoR01.length > 0
+    ? Math.max(...contextoR01.map(d => parseInt((d.trimestredesc || "").slice(0, 4), 10) || 0))
+    : null;
+  const covR02 = maxR02 ? `R02 hasta ${maxR02}T4.` : "";
+  const covR01 = maxR01 ? `R01 hasta ${maxR01}T4.` : "";
+  const coverage = [covR02, covR01].filter(Boolean).join(" ");
+
+  if (!results || results.events.length === 0) {
+    el.innerHTML = `No hay eventos válidos con esta configuración. Probá bajar el umbral de ajuste o ampliar el horizonte. ${coverage}`;
+    return;
+  }
+
+  const base = `Eventos: <strong>${results.events.length}</strong> | EI IPC general: <strong>${formatPP(results.eiGeneral)}</strong> | EI alimentos: <strong>${formatPP(results.eiFood)}</strong>.`;
+  if (params.mode === "analitico") {
+    el.innerHTML = `${base} El p-value placebo para IPC general es <strong>${results.pValueGeneral === null ? "-" : results.pValueGeneral.toFixed(3)}</strong>. ${coverage}`;
+    return;
+  }
+
+  const stories = {
+    1: "Paso 1: observamos la trayectoria promedio de inflación antes y después de ajustes del salario mínimo.",
+    2: "Paso 2: medimos el EI (diferencia post-pre) y verificamos magnitud en IPC general y alimentos.",
+    3: "Paso 3: limpiamos eventos solapados y exigimos ajustes más grandes para robustez.",
+    4: "Paso 4: conectamos el fenómeno con contexto social (franja 1 SML, formalidad e internet).",
+    5: "Paso 5: usamos la curva estimada para simular escenarios alternativos de ajuste."
+  };
+  el.innerHTML = `${stories[params.step] || stories[1]} ${base} ${coverage}`;
+}
+
+function updateEspiralDashboard() {
+  const kEvents = document.getElementById('esp-kpi-events');
+  if (!kEvents) return;
+  syncEspiralLabels();
+
+  const params = getEspiralParams();
+  if (!espiralReady) {
+    kEvents.textContent = "-";
+    document.getElementById('esp-kpi-ei-gen').textContent = "-";
+    document.getElementById('esp-kpi-ei-food').textContent = "-";
+    document.getElementById('esp-kpi-pgen').textContent = "-";
+    if (!espiralLoading) setEspiralStatusMessage("Esperando carga de la base macro de espiral...");
+    return;
+  }
+
+  const results = computeEspiralResults(params);
+  const pText = results && results.pValueGeneral !== null ? results.pValueGeneral.toFixed(3) : "-";
+  kEvents.textContent = results ? String(results.events.length) : "-";
+  document.getElementById('esp-kpi-ei-gen').textContent = results ? formatPP(results.eiGeneral) : "-";
+  document.getElementById('esp-kpi-ei-food').textContent = results ? formatPP(results.eiFood) : "-";
+  document.getElementById('esp-kpi-pgen').textContent = pText;
+
+  renderEspiralEventPlot(results);
+  renderEspiralPlaceboPlot(results);
+  renderEspiralSimPlot(results);
+  renderEspiralContextPlot(params);
+  renderEspiralTable(results);
+  renderEspiralStory(results, params);
 }
 // Iniciar aplicación
 document.addEventListener('DOMContentLoaded', init);

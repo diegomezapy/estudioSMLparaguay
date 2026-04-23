@@ -13,6 +13,8 @@ tmp/
 bases/*
 data/*.csv
 !data/db_app.csv
+!data/espiral_salario_precios.csv
+!data/contexto_r01.csv
 data/personas/*
 
 # Mantener documentación de carpetas
