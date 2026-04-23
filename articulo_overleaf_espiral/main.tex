@@ -1,0 +1,63 @@
+\documentclass[12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue,
+  pdftitle={Espiral salario-precios en Paraguay},
+  pdfauthor={Diego Bernardo Meza}
+}
+
+\input{tables/macros.tex}
+
+\title{Espiral Salario--Precios en Paraguay:\\
+Evidencia Descriptiva y de Evento con Datos Laborales, de Hogares y de Inflacion}
+
+\author{
+Diego Bernardo Meza\\
+\small Investigador independiente\\
+\small \texttt{dmeza.py@gmail.com}
+\and
+Colaboracion metodologica con Diego Daniel Sanabria
+}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Este articulo analiza el fenomeno de espiral salario--precios para Paraguay integrando tres fuentes: microdatos laborales (R02), microdatos de hogares (R01) e inflacion mensual con hitos de ajuste del salario minimo legal (SML). Con una estrategia de evento de ventana simetrica, se identifican \nEventosTotal{} eventos con datos completos y \nEventosMain{} eventos no solapados en la especificacion principal (h = 6). El efecto de evento promedio sobre IPC general es \eiGeneralMain{} pp y sobre IPC alimentos es \eiAlimentosMain{} pp; los placebo Monte Carlo asociados arrojan p-valores de \pGeneralMain{} y \pAlimentosMain{}, respectivamente. Los resultados sugieren heterogeneidad temporal y sensibilidad a especificaciones, por lo que la evidencia se interpreta como insumo analitico para politica publica, no como prueba causal definitiva.
+\end{abstract}
+
+\noindent\textbf{Palabras clave:} salario minimo, inflacion, pass-through, formalidad, Paraguay.\\
+\textbf{JEL:} J31, E31, C21.
+
+\input{sections/01_introduccion.tex}
+\input{sections/02_datos_metodos.tex}
+\input{sections/03_resultados.tex}
+\input{sections/04_discusion.tex}
+\input{sections/05_declaraciones.tex}
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}

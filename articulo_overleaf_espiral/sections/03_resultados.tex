@@ -1,0 +1,74 @@
+\section{Resultados}
+
+\subsection{Perfil promedio del evento}
+
+La Figura~\ref{fig:event} muestra la trayectoria promedio relativa al periodo pre-evento. Visualmente, el patron es heterogeneo: hay eventos con aumentos y eventos con caidas de inflacion post-ajuste.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig_event_profile.pdf}
+\caption{Perfil promedio de inflacion alrededor del ajuste del SML (h=6, eventos no solapados)}
+\label{fig:event}
+\end{figure}
+
+A nivel promedio, el EI en IPC general es \eiGeneralMain{} pp y en IPC alimentos \eiAlimentosMain{} pp.
+
+\subsection{Evidencia placebo}
+
+La Figura~\ref{fig:placebo} ubica el EI observado frente a su distribucion placebo. Los p-valores de referencia son \pGeneralMain{} para IPC general y \pAlimentosMain{} para IPC alimentos. Esto sugiere cautela frente a inferencias fuertes de causalidad en la especificacion principal.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig_placebo_hist.pdf}
+\caption{Distribucion placebo Monte Carlo para EI de IPC general}
+\label{fig:placebo}
+\end{figure}
+
+\subsection{Robustez de ventanas y limpieza de solapamiento}
+
+La Tabla~\ref{tab:rob} resume sensibilidad por horizonte ($h=3,6,9$) y criterio de solapamiento. La magnitud y significancia descriptiva varian con la especificacion, consistente con shocks macro y composicion temporal de eventos.
+
+\begin{table}[H]
+\centering
+\caption{Robustez por horizonte y criterio de solapamiento}
+\label{tab:rob}
+\input{tables/table_robustness.tex}
+\end{table}
+
+\subsection{Contexto laboral y de hogares}
+
+La Figura~\ref{fig:contexto} integra series trimestrales de R02 y R01 con marcas de trimestres de ajuste del SML. Esta lectura permite contextualizar el fenomeno en dinamicas de formalidad, conectividad y condiciones del hogar.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/fig_contexto_trimestral.pdf}
+\caption{Contexto R02 + R01 con marcas de trimestres de ajuste del SML}
+\label{fig:contexto}
+\end{figure}
+
+Como complemento distributivo, la Figura~\ref{fig:densidad} muestra concentracion de masa alrededor de 1 SML (banda $\pm 10\%$), en linea con patrones de bunching descriptivo.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/fig_density_rel_sml.pdf}
+\caption{Distribucion de ingreso relativo al SML y banda $\pm 10\%$}
+\label{fig:densidad}
+\end{figure}
+
+\subsection{Auditoria por evento}
+
+Para trazabilidad, la Tabla~\ref{tab:eventos} reporta ajuste, EI y coeficientes de traspaso por evento individual.
+
+\begin{table}[H]
+\centering
+\caption{Metricas por evento (especificacion principal)}
+\label{tab:eventos}
+\input{tables/table_event_metrics.tex}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Contexto trimestral 2025 (R02 + R01)}
+\label{tab:ctx2025}
+\input{tables/table_context_2025.tex}
+\end{table}

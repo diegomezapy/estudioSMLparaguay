@@ -1,0 +1,48 @@
+\section{Datos y metodologia}
+
+\subsection{Fuentes de datos}
+
+Se integran tres bloques:
+\begin{itemize}
+  \item \textbf{R02 (EPHC personas):} ingresos laborales, formalidad y caracteristicas sociodemograficas.
+  \item \textbf{R01 (EPHC hogares):} conectividad, calidad material de vivienda y movilidad del hogar.
+  \item \textbf{Serie macro mensual:} IPC general, IPC alimentos y fechas de ajuste del salario minimo legal.
+\end{itemize}
+
+Los indicadores de hogares se agregan por trimestre y se unen con los de R02 via etiqueta temporal \texttt{YYYYTrimQ}. Para evitar comparaciones invalidas, se diferencia explicitamente entre unidad persona (R02) y unidad hogar (R01).
+
+\subsection{Variables de interes}
+
+\begin{itemize}
+  \item \textbf{Franja salarial relativa al SML:} \texttt{Menos de 1 SML}, \texttt{1 SML}, \texttt{Mas de 1 SML}, con tolerancia base de $\pm 10\%$.
+  \item \textbf{Formalidad laboral:} proxy de cotizacion a caja/IPS.
+  \item \textbf{Indicadores R01:} porcentaje de hogares con internet, material habitacional apto y movilidad propia.
+  \item \textbf{Inflacion mensual:} variacion porcentual del indice respecto al mes previo para IPC general y alimentos.
+\end{itemize}
+
+\subsection{Estrategia empirica de evento}
+
+Para cada evento de ajuste del SML se construye una ventana simetrica de $h$ meses pre y post (especificacion principal: $h=6$). El estadistico principal es:
+\begin{equation}
+EI_e = \overline{\pi}^{\,post}_e - \overline{\pi}^{\,pre}_e,
+\end{equation}
+donde $\pi$ representa inflacion mensual y $e$ denota evento.
+
+Se reporta ademas un indicador de traspaso acumulado:
+\begin{equation}
+CT_e = \frac{EI_e}{\Delta SML_e},
+\end{equation}
+con $\Delta SML_e$ en puntos porcentuales.
+
+La inferencia descriptiva se complementa con placebo Monte Carlo: se sortean ventanas ``no-evento'' de igual tamano y se compara el $EI$ observado frente a la distribucion simulada.
+
+\subsection{Configuracion principal}
+
+La configuracion central del paper usa eventos no solapados y $h=6$, con \nEventosMain{} eventos. Los resultados clave se resumen en la Tabla~\ref{tab:key}.
+
+\begin{table}[H]
+\centering
+\caption{Resultados clave de la especificacion principal}
+\label{tab:key}
+\input{tables/table_key_results.tex}
+\end{table}
