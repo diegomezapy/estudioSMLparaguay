@@ -9,6 +9,43 @@ let contextoR01 = [];
 let contextoR01Ready = false;
 let contextoR01Loading = false;
 const espiralCache = new Map();
+let projectionInitialized = false;
+
+const PROJECTION_PRESETS = {
+  tendencia: {
+    horizon: 15,
+    infl: 5.8,
+    smlGrowth: 4.8,
+    baseMult: 1.15,
+    hogarMult: 1.20,
+    health: 12,
+    transport: 10,
+    education: 8,
+    servicePremium: 2.0
+  },
+  proteccion: {
+    horizon: 15,
+    infl: 4.2,
+    smlGrowth: 7.0,
+    baseMult: 1.05,
+    hogarMult: 1.10,
+    health: 4,
+    transport: 4,
+    education: 3,
+    servicePremium: 0.5
+  },
+  deterioro: {
+    horizon: 15,
+    infl: 7.2,
+    smlGrowth: 4.0,
+    baseMult: 1.30,
+    hogarMult: 1.35,
+    health: 20,
+    transport: 16,
+    education: 14,
+    servicePremium: 3.2
+  }
+};
 
 // Diccionario de Variables (EPHC INE)
 const DICT = {
@@ -76,7 +113,27 @@ const els = {
   cate: document.getElementById('filter-cate-group'),
   internet: document.getElementById('filter-internet'),
   agua: document.getElementById('filter-agua'),
-  piso: document.getElementById('filter-piso')
+  piso: document.getElementById('filter-piso'),
+
+  projHorizon: document.getElementById('proj-horizon'),
+  projHorizonVal: document.getElementById('proj-horizon-val'),
+  projInfl: document.getElementById('proj-infl'),
+  projInflVal: document.getElementById('proj-infl-val'),
+  projSmlGrowth: document.getElementById('proj-sml-growth'),
+  projSmlGrowthVal: document.getElementById('proj-sml-growth-val'),
+  projBaseMult: document.getElementById('proj-base-mult'),
+  projBaseMultVal: document.getElementById('proj-base-mult-val'),
+  projHogarMult: document.getElementById('proj-hogar-mult'),
+  projHogarMultVal: document.getElementById('proj-hogar-mult-val'),
+  projHealth: document.getElementById('proj-health'),
+  projHealthVal: document.getElementById('proj-health-val'),
+  projTransport: document.getElementById('proj-transport'),
+  projTransportVal: document.getElementById('proj-transport-val'),
+  projEducation: document.getElementById('proj-education'),
+  projEducationVal: document.getElementById('proj-education-val'),
+  projServicePremium: document.getElementById('proj-service-premium'),
+  projServicePremiumVal: document.getElementById('proj-service-premium-val'),
+  projReset: document.getElementById('proj-reset')
 };
 
 // Utilidades
@@ -100,6 +157,7 @@ const sum = (arr) => {
 };
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 const formatPP = (v) => (v === null || !Number.isFinite(v) ? "-" : `${v >= 0 ? "+" : ""}${v.toFixed(2)} pp`);
+const formatPct = (num, dec = 1) => `${Number(num || 0).toFixed(dec)}%`;
 
 const calcWMean = (data, valKey, wKey) => {
   let sumW = 0, sumV = 0;
@@ -219,6 +277,8 @@ function processData(data) {
   setupEspiralTabResize();
   loadEspiralData();
   loadContextoR01Data();
+  initProjectionControls();
+  applyProjectionPreset('tendencia');
 
   updateApp();
 }
@@ -265,6 +325,326 @@ function populateSelects(data) {
   addButtons(els.rama, ramas, 'rama_pea', 'filter-rama');
   addButtons(els.ocup, ocups, 'ocup_pea', 'filter-ocup');
   addButtons(els.cate, cates, 'cate_pea', 'filter-cate');
+}
+
+function setProjectionSliderLabels() {
+  if (!els.projHorizon) return;
+  els.projHorizonVal.textContent = String(parseInt(els.projHorizon.value, 10));
+  els.projInflVal.textContent = Number(els.projInfl.value).toFixed(1);
+  els.projSmlGrowthVal.textContent = Number(els.projSmlGrowth.value).toFixed(1);
+  els.projBaseMultVal.textContent = Number(els.projBaseMult.value).toFixed(2);
+  els.projHogarMultVal.textContent = Number(els.projHogarMult.value).toFixed(2);
+  els.projHealthVal.textContent = String(parseInt(els.projHealth.value, 10));
+  els.projTransportVal.textContent = String(parseInt(els.projTransport.value, 10));
+  els.projEducationVal.textContent = String(parseInt(els.projEducation.value, 10));
+  els.projServicePremiumVal.textContent = Number(els.projServicePremium.value).toFixed(1);
+}
+
+function getProjectionParams() {
+  if (!els.projHorizon) return null;
+  return {
+    horizon: parseInt(els.projHorizon.value, 10),
+    infl: Number(els.projInfl.value),
+    smlGrowth: Number(els.projSmlGrowth.value),
+    baseMult: Number(els.projBaseMult.value),
+    hogarMult: Number(els.projHogarMult.value),
+    health: Number(els.projHealth.value),
+    transport: Number(els.projTransport.value),
+    education: Number(els.projEducation.value),
+    servicePremium: Number(els.projServicePremium.value)
+  };
+}
+
+function applyProjectionPreset(name) {
+  const preset = PROJECTION_PRESETS[name] || PROJECTION_PRESETS.tendencia;
+  if (!els.projHorizon) return;
+  els.projHorizon.value = preset.horizon;
+  els.projInfl.value = preset.infl;
+  els.projSmlGrowth.value = preset.smlGrowth;
+  els.projBaseMult.value = preset.baseMult;
+  els.projHogarMult.value = preset.hogarMult;
+  els.projHealth.value = preset.health;
+  els.projTransport.value = preset.transport;
+  els.projEducation.value = preset.education;
+  els.projServicePremium.value = preset.servicePremium;
+  setProjectionSliderLabels();
+  drawProjections();
+}
+
+function initProjectionControls() {
+  if (projectionInitialized || !els.projHorizon) return;
+  const sliders = [
+    els.projHorizon,
+    els.projInfl,
+    els.projSmlGrowth,
+    els.projBaseMult,
+    els.projHogarMult,
+    els.projHealth,
+    els.projTransport,
+    els.projEducation,
+    els.projServicePremium
+  ];
+  sliders.forEach((el) => {
+    if (!el) return;
+    el.addEventListener('input', () => {
+      setProjectionSliderLabels();
+      drawProjections();
+    });
+    el.addEventListener('change', () => {
+      setProjectionSliderLabels();
+      drawProjections();
+    });
+  });
+
+  if (els.projReset) {
+    els.projReset.addEventListener('click', () => applyProjectionPreset('tendencia'));
+  }
+  document.querySelectorAll('.proj-preset').forEach((btn) => {
+    btn.addEventListener('click', () => applyProjectionPreset(btn.dataset.scenario));
+  });
+  setProjectionSliderLabels();
+  projectionInitialized = true;
+}
+
+function getProjectionBaseRows() {
+  const src = filteredData.length > 0 ? filteredData : rawData;
+  if (!src || src.length === 0) return null;
+
+  let maxPeriod = -Infinity;
+  src.forEach((d) => {
+    const period = (Number(d.anio) * 10) + Number(d.q);
+    if (!isNaN(period) && period > maxPeriod) maxPeriod = period;
+  });
+  if (!isFinite(maxPeriod)) return null;
+
+  const baseRows = src.filter((d) => ((Number(d.anio) * 10) + Number(d.q)) === maxPeriod);
+  if (baseRows.length === 0) return null;
+
+  const baseSmlNom = calcWMean(baseRows, 'sml', 'w') || Number(baseRows[0].sml) || 0;
+  const baseIpc = calcWMean(baseRows, 'ipc', 'w') || Number(baseRows[0].ipc) || 100;
+  const baseYear = Number(baseRows[0].anio);
+  const baseQ = Number(baseRows[0].q);
+
+  return {
+    baseRows,
+    baseSmlNom,
+    baseIpc,
+    baseYear,
+    baseQ,
+    baseLabel: `${baseYear}-Q${baseQ}`
+  };
+}
+
+function computeProjectionSeries(base, params) {
+  const infl = params.infl / 100;
+  const smlGrowth = params.smlGrowth / 100;
+  const servicePremium = params.servicePremium / 100;
+  const baseNeedCore = base.baseSmlNom * params.baseMult * params.hogarMult;
+  const baseNeedServices = base.baseSmlNom * ((params.health + params.transport + params.education) / 100);
+  const rows = [];
+
+  for (let t = 0; t <= params.horizon; t++) {
+    const year = base.baseYear + t;
+    const inflFactor = Math.pow(1 + infl, t);
+    const serviceInflFactor = Math.pow(1 + infl + servicePremium, t);
+    const smlNominal = base.baseSmlNom * Math.pow(1 + smlGrowth, t);
+    const smlReal = inflFactor > 0 ? (smlNominal / inflFactor) : smlNominal;
+    const needNominal = (baseNeedCore * inflFactor) + (baseNeedServices * serviceInflFactor);
+    const needReal = inflFactor > 0 ? (needNominal / inflFactor) : needNominal;
+    const gapReal = smlReal - needReal;
+    const coverage = needNominal > 0 ? (smlNominal / needNominal) * 100 : null;
+
+    rows.push({
+      t,
+      year,
+      smlNominal,
+      smlReal,
+      needNominal,
+      needReal,
+      gapReal,
+      coverage
+    });
+  }
+  return rows;
+}
+
+function renderProjectionTable(series) {
+  const tbody = document.getElementById('proj-table-body');
+  if (!tbody) return;
+  if (!series || series.length === 0) {
+    tbody.innerHTML = '';
+    return;
+  }
+  const horizon = series[series.length - 1].t;
+  const anchors = [0, Math.round(horizon / 3), Math.round((2 * horizon) / 3), horizon];
+  const uniqueAnchors = Array.from(new Set(anchors)).sort((a, b) => a - b);
+  let html = '';
+  uniqueAnchors.forEach((idx) => {
+    const row = series.find((r) => r.t === idx);
+    if (!row) return;
+    html += `
+      <tr>
+        <td>${row.year}</td>
+        <td class="text-end">${formatGs(row.smlNominal)}</td>
+        <td class="text-end">${formatGs(row.needNominal)}</td>
+        <td class="text-end">${formatGs(row.smlReal)}</td>
+        <td class="text-end">${formatGs(row.needReal)}</td>
+        <td class="text-end">${formatPct(row.coverage, 1)}</td>
+      </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function drawProjections() {
+  if (!document.getElementById('plot-proj-nominal')) return;
+  const base = getProjectionBaseRows();
+  const params = getProjectionParams();
+  if (!base || !params || base.baseSmlNom <= 0) {
+    ['plot-proj-nominal', 'plot-proj-real', 'plot-proj-gap'].forEach((id) => Plotly.purge(id));
+    ['proj-base-period', 'proj-kpi-base', 'proj-kpi-final-sml-real', 'proj-kpi-final-need-real', 'proj-kpi-gap-real', 'proj-kpi-coverage', 'proj-kpi-breakyear'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '-';
+    });
+    renderProjectionTable([]);
+    return;
+  }
+
+  const series = computeProjectionSeries(base, params);
+  const years = series.map((r) => r.year);
+  const finalRow = series[series.length - 1];
+  const firstBreak = series.find((r) => r.coverage !== null && r.coverage < 100);
+  const baseInfoEl = document.getElementById('proj-base-period');
+  if (baseInfoEl) baseInfoEl.textContent = base.baseLabel;
+
+  const baseSmlEl = document.getElementById('proj-kpi-base');
+  if (baseSmlEl) baseSmlEl.textContent = `${formatGs(base.baseSmlNom)} Gs`;
+
+  const kSmlReal = document.getElementById('proj-kpi-final-sml-real');
+  if (kSmlReal) kSmlReal.textContent = `${formatGs(finalRow.smlReal)} Gs`;
+  const kNeedReal = document.getElementById('proj-kpi-final-need-real');
+  if (kNeedReal) kNeedReal.textContent = `${formatGs(finalRow.needReal)} Gs`;
+  const kGapReal = document.getElementById('proj-kpi-gap-real');
+  if (kGapReal) kGapReal.textContent = `${finalRow.gapReal < 0 ? '-' : ''}${formatGs(Math.abs(finalRow.gapReal))} Gs`;
+  const kCoverage = document.getElementById('proj-kpi-coverage');
+  if (kCoverage) kCoverage.textContent = formatPct(finalRow.coverage, 1);
+  const kBreak = document.getElementById('proj-kpi-breakyear');
+  if (kBreak) kBreak.textContent = firstBreak ? `${firstBreak.year}` : 'No cae bajo 100%';
+
+  const nominalTraces = [
+    {
+      x: years,
+      y: series.map((r) => r.smlNominal),
+      name: 'SML nominal proyectado',
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { color: '#0d6efd', width: 3 }
+    },
+    {
+      x: years,
+      y: series.map((r) => r.needNominal),
+      name: 'Ingreso necesario nominal',
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { color: '#dc3545', width: 3 }
+    }
+  ];
+  Plotly.newPlot(
+    'plot-proj-nominal',
+    nominalTraces,
+    {
+      margin: { t: 20, b: 40, l: 60, r: 20 },
+      yaxis: { tickformat: ',.0f' },
+      legend: { orientation: 'h', y: -0.2 }
+    },
+    { responsive: true, displayModeBar: false }
+  );
+
+  const realTraces = [
+    {
+      x: years,
+      y: series.map((r) => r.smlReal),
+      name: 'SML real',
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { color: '#198754', width: 3 }
+    },
+    {
+      x: years,
+      y: series.map((r) => r.needReal),
+      name: 'Ingreso necesario real',
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { color: '#6f42c1', width: 3 }
+    }
+  ];
+  Plotly.newPlot(
+    'plot-proj-real',
+    realTraces,
+    {
+      margin: { t: 20, b: 40, l: 60, r: 20 },
+      yaxis: { tickformat: ',.0f' },
+      legend: { orientation: 'h', y: -0.2 }
+    },
+    { responsive: true, displayModeBar: false }
+  );
+
+  const gapTraces = [
+    {
+      x: years,
+      y: series.map((r) => r.gapReal),
+      name: 'Brecha real (SML - Necesario)',
+      type: 'bar',
+      marker: {
+        color: series.map((r) => (r.gapReal >= 0 ? '#198754' : '#dc3545'))
+      }
+    },
+    {
+      x: years,
+      y: series.map((r) => r.coverage),
+      name: 'Cobertura (%)',
+      type: 'scatter',
+      mode: 'lines+markers',
+      yaxis: 'y2',
+      line: { color: '#212529', width: 2 }
+    }
+  ];
+  Plotly.newPlot(
+    'plot-proj-gap',
+    gapTraces,
+    {
+      margin: { t: 20, b: 40, l: 60, r: 60 },
+      yaxis: { title: 'Brecha real (Gs)', tickformat: ',.0f' },
+      yaxis2: {
+        title: 'Cobertura (%)',
+        overlaying: 'y',
+        side: 'right',
+        rangemode: 'tozero'
+      },
+      legend: { orientation: 'h', y: -0.25 },
+      shapes: [
+        {
+          type: 'line',
+          x0: years[0],
+          x1: years[years.length - 1],
+          y0: 0,
+          y1: 0,
+          line: { color: '#6c757d', width: 1, dash: 'dot' }
+        },
+        {
+          type: 'line',
+          x0: years[0],
+          x1: years[years.length - 1],
+          y0: 100,
+          y1: 100,
+          yref: 'y2',
+          line: { color: '#6c757d', width: 1, dash: 'dot' }
+        }
+      ]
+    },
+    { responsive: true, displayModeBar: false }
+  );
+
+  renderProjectionTable(series);
 }
 
 function updateApp() {
@@ -329,6 +709,7 @@ function updateApp() {
   updateKPIs(sumWTotal);
   drawPlots();
   drawHousingPlots();
+  drawProjections();
   updateEspiralDashboard();
   updateMetodologiaMetadata();
 }

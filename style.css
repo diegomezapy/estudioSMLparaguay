@@ -48,3 +48,35 @@ body {
 #sidebar-wrapper::-webkit-scrollbar-thumb:hover {
   background: #aaa; 
 }
+
+#proyecciones .proj-control-group {
+  margin-bottom: 0.55rem;
+}
+
+#proyecciones .proj-control-group .form-range {
+  margin-bottom: 0;
+}
+
+#proyecciones .proj-kpi-card {
+  background: linear-gradient(145deg, #ffffff 0%, #f7f9fc 100%);
+  border: 1px solid #e9ecef;
+}
+
+#proyecciones .card-header {
+  border-bottom: 0;
+}
+
+#proyecciones .table td,
+#proyecciones .table th {
+  white-space: nowrap;
+}
+
+@media (max-width: 992px) {
+  #proyecciones .proj-preset {
+    flex: 1 1 auto;
+  }
+  #proyecciones .table td,
+  #proyecciones .table th {
+    font-size: 0.78rem;
+  }
+}
